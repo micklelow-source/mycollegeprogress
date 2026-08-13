@@ -1,0 +1,2562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex, nofollow">
+<title>Progress Command Center</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%96%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<style>
+/* ============================================================
+   Progress Command Center — single-file dashboard
+   Palette: validated data-viz reference palette (light + dark).
+   No external requests. All data stays in this browser.
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+/* Author display rules outrank the UA [hidden] rule — .btn{display:inline-flex}
+   was keeping hidden buttons on screen. Make hidden always mean hidden. */
+[hidden] { display: none !important; }
+
+/* ---------- 1. Design tokens ----------
+   Purple + white. Categorical slots and the purple ordinal ramp were both run
+   through the palette validator against these exact surfaces (#ffffff light,
+   #17141f dark) — see README. Status colours stay fixed and are never themed. */
+:root {
+  color-scheme: light;
+
+  --plane:      #f7f4ff;
+  --surface:    #ffffff;
+  --surface-2:  #f2edff;
+  --ink:        #1a1524;
+  --ink-2:      #55506b;
+  --ink-3:      #837e99;
+  --grid:       #e8e2f7;
+  --axis:       #cdc4e8;
+  --border:     rgba(26, 21, 36, .10);
+  --border-2:   rgba(26, 21, 36, .16);
+
+  /* categorical series (fixed order, never cycled) */
+  --s1: #6d3fd4;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+
+  /* sequential purple ramp */
+  --seq-100: #ded7fb;
+  --seq-250: #b5a4f2;
+  --seq-400: #8b71e6;
+  --seq-450: #6d3fd4;
+  --seq-550: #4e2c9a;
+  --seq-700: #241247;
+
+  /* ordinal ramp for award levels (school -> national) */
+  --ord-1: #b5a4f2;
+  --ord-2: #8b71e6;
+  --ord-3: #6d3fd4;
+  --ord-4: #4e2c9a;
+
+  /* status (reserved — never used as a series colour) */
+  --good:      #0ca30c;
+  --warning:   #fab219;
+  --serious:   #ec835a;
+  --critical:  #d03b3b;
+  --good-text: #006300;
+
+  --mute-mark: #cdc4e8;
+
+  /* glow & ornament (chrome only, never data) */
+  --glow-a: rgba(109, 63, 212, .30);
+  --glow-b: rgba(168, 120, 240, .26);
+  --glow-c: rgba(76, 40, 160, .20);
+  --ornament: rgba(109, 63, 212, .13);
+  --sheen:  rgba(255, 255, 255, .55);
+  --shadow-1: 0 1px 2px rgba(26, 21, 36, .05), 0 8px 24px -12px rgba(60, 30, 120, .20);
+  --shadow-2: 0 2px 4px rgba(26, 21, 36, .06), 0 18px 40px -16px rgba(60, 30, 120, .28);
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plane:     #0e0c14;
+    --surface:   #17141f;
+    --surface-2: #211c2d;
+    --ink:       #ffffff;
+    --ink-2:     #c6bfd8;
+    --ink-3:     #8d86a3;
+    --grid:      #2a2438;
+    --axis:      #3a3350;
+    --border:    rgba(255, 255, 255, .10);
+    --border-2:  rgba(255, 255, 255, .18);
+
+    --s1: #9085e9;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+
+    --seq-100: #2d2150;
+    --seq-250: #5e35b8;
+    --seq-400: #8b71e6;
+    --seq-450: #9085e9;
+    --seq-550: #b5a4f2;
+    --seq-700: #ded7fb;
+
+    --ord-1: #ded7fb;
+    --ord-2: #b5a4f2;
+    --ord-3: #8b71e6;
+    --ord-4: #5e35b8;
+
+    --good-text: #0ca30c;
+    --mute-mark: #3a3350;
+
+    --glow-a: rgba(144, 133, 233, .30);
+    --glow-b: rgba(168, 120, 240, .24);
+    --glow-c: rgba(94, 53, 184, .24);
+    --ornament: rgba(181, 164, 242, .15);
+    --sheen:  rgba(255, 255, 255, .22);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -12px rgba(0, 0, 0, .7);
+    --shadow-2: 0 2px 4px rgba(0, 0, 0, .5), 0 18px 40px -16px rgba(0, 0, 0, .8);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane:     #0e0c14;
+  --surface:   #17141f;
+  --surface-2: #211c2d;
+  --ink:       #ffffff;
+  --ink-2:     #c6bfd8;
+  --ink-3:     #8d86a3;
+  --grid:      #2a2438;
+  --axis:      #3a3350;
+  --border:    rgba(255, 255, 255, .10);
+  --border-2:  rgba(255, 255, 255, .18);
+
+  --s1: #9085e9;
+  --s2: #d95926;
+  --s3: #199e70;
+  --s4: #c98500;
+
+  --seq-100: #2d2150;
+  --seq-250: #5e35b8;
+  --seq-400: #8b71e6;
+  --seq-450: #9085e9;
+  --seq-550: #b5a4f2;
+  --seq-700: #ded7fb;
+
+  --ord-1: #ded7fb;
+  --ord-2: #b5a4f2;
+  --ord-3: #8b71e6;
+  --ord-4: #5e35b8;
+
+  --good-text: #0ca30c;
+  --mute-mark: #3a3350;
+
+  --glow-a: rgba(144, 133, 233, .30);
+  --glow-b: rgba(168, 120, 240, .24);
+  --glow-c: rgba(94, 53, 184, .24);
+  --ornament: rgba(181, 164, 242, .15);
+  --sheen:  rgba(255, 255, 255, .22);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -12px rgba(0, 0, 0, .7);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, .5), 0 18px 40px -16px rgba(0, 0, 0, .8);
+}
+
+/* ---------- 2. Page shell ---------- */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--plane);
+  color: var(--ink);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Flashy-but-quiet backdrop: three drifting light fields behind everything.
+   Chrome only — it never sits behind a chart plot area. */
+.aurora { position: fixed; inset: -20vmax; z-index: 0; pointer-events: none; filter: blur(60px); opacity: .9; }
+.aurora i { position: absolute; display: block; border-radius: 50%; mix-blend-mode: normal; }
+.aurora i:nth-child(1) { width: 52vmax; height: 52vmax; left: -6vmax;  top: -4vmax;  background: radial-gradient(circle at 50% 50%, var(--glow-a), transparent 68%); animation: drift-a 34s ease-in-out infinite alternate; }
+.aurora i:nth-child(2) { width: 46vmax; height: 46vmax; right: -8vmax; top: 6vmax;   background: radial-gradient(circle at 50% 50%, var(--glow-b), transparent 68%); animation: drift-b 42s ease-in-out infinite alternate; }
+.aurora i:nth-child(3) { width: 40vmax; height: 40vmax; left: 28vmax;  bottom: -6vmax; background: radial-gradient(circle at 50% 50%, var(--glow-c), transparent 68%); animation: drift-c 50s ease-in-out infinite alternate; }
+@keyframes drift-a { to { transform: translate3d(8vmax, 6vmax, 0) scale(1.14); } }
+@keyframes drift-b { to { transform: translate3d(-10vmax, 8vmax, 0) scale(1.08); } }
+@keyframes drift-c { to { transform: translate3d(6vmax, -8vmax, 0) scale(1.16); } }
+
+.wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 20px 16px 72px; }
+
+/* ---------- 3. Header ---------- */
+.top { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 320px; }
+.crest {
+  flex: none; width: 46px; height: 46px; border-radius: 13px;
+  display: grid; place-items: center; position: relative; overflow: hidden;
+  background: linear-gradient(145deg, var(--seq-450), var(--seq-700));
+  box-shadow: var(--shadow-1), inset 0 1px 0 var(--sheen);
+}
+.crest::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 30%, var(--sheen) 48%, transparent 62%);
+  transform: translateX(-120%); animation: sheen 6s ease-in-out infinite;
+}
+@keyframes sheen { 0%, 62% { transform: translateX(-120%); } 88%, 100% { transform: translateX(120%); } }
+.brand h1 { font-size: 1.22rem; font-weight: 650; letter-spacing: -.015em; line-height: 1.25; }
+.brand p { font-size: .82rem; color: var(--ink-2); }
+
+.top-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ---------- 4. Buttons & controls ---------- */
+.btn {
+  font: inherit; font-size: .84rem; font-weight: 550; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--border-2); border-radius: 999px;
+  padding: 7px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; transition: background .16s, border-color .16s, transform .16s, box-shadow .16s;
+}
+.btn:hover { background: var(--surface-2); border-color: var(--ink-3); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--seq-450); outline-offset: 2px; }
+.btn.primary {
+  background: linear-gradient(145deg, var(--seq-450), var(--seq-550));
+  color: #fff; border-color: transparent; box-shadow: var(--shadow-1);
+}
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--ink); }
+.btn.danger { color: var(--critical); border-color: var(--border-2); }
+.btn.danger:hover { background: color-mix(in srgb, var(--critical) 10%, transparent); border-color: var(--critical); }
+.btn.tiny { min-height: 28px; padding: 3px 10px; font-size: .76rem; }
+.btn[aria-pressed="true"] { background: var(--surface-2); border-color: var(--ink-3); }
+
+/* ---------- 5. Tabs ---------- */
+.tabs {
+  display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px; margin-bottom: 20px; box-shadow: var(--shadow-1);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  font: inherit; font-size: .86rem; font-weight: 550; white-space: nowrap;
+  color: var(--ink-2); background: none; border: 0; border-radius: 999px;
+  padding: 8px 15px; cursor: pointer; position: relative; min-height: 36px;
+  transition: color .16s, background .16s;
+}
+.tab:hover { color: var(--ink); background: var(--surface-2); }
+.tab[aria-selected="true"] { color: #fff; background: linear-gradient(145deg, var(--seq-450), var(--seq-550)); }
+.tab:focus-visible { outline: 2px solid var(--seq-450); outline-offset: 2px; }
+
+.panel[hidden] { display: none; }
+.panel { animation: rise .34s cubic-bezier(.22,.75,.3,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+/* ---------- 6. Cards & grid ---------- */
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; }
+.card {
+  grid-column: span 12;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 18px; box-shadow: var(--shadow-1); min-width: 0;
+  transition: box-shadow .2s, border-color .2s, transform .2s;
+}
+.card:hover { box-shadow: var(--shadow-2); border-color: var(--border-2); }
+.card.span-4 { grid-column: span 4; }
+.card.span-5 { grid-column: span 5; }
+.card.span-6 { grid-column: span 6; }
+.card.span-7 { grid-column: span 7; }
+.card.span-8 { grid-column: span 8; }
+@media (max-width: 900px) { .card.span-4, .card.span-5, .card.span-6, .card.span-7, .card.span-8 { grid-column: span 12; } }
+
+.card-head { display: flex; align-items: baseline; gap: 10px; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; }
+.card h2 { font-size: .96rem; font-weight: 620; letter-spacing: -.01em; }
+.card h3 { font-size: .84rem; font-weight: 600; }
+.sub { font-size: .78rem; color: var(--ink-2); }
+.card-head .sub { margin-left: auto; }
+.card > .sub:first-of-type { margin-bottom: 14px; }
+
+/* ---------- 7. Hero figure + readiness ring ---------- */
+.hero { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+.ring-wrap { position: relative; flex: none; width: 208px; height: 208px; }
+.ring-svg { position: absolute; inset: 20px; display: block; width: 168px; height: 168px; transform: rotate(-90deg); }
+/* Laurel wreath, generated in JS so leaf spacing follows the arc exactly. */
+.wreath { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; }
+.wreath .leaf { fill: var(--seq-250); opacity: .85; }
+.wreath .stem { fill: none; stroke: var(--seq-400); stroke-width: 1.6; stroke-linecap: round; opacity: .7; }
+.wreath .pip  { fill: var(--seq-450); }
+.ring-track { fill: none; stroke: var(--grid); stroke-width: 11; }
+.ring-fill {
+  fill: none; stroke: url(#ringGrad); stroke-width: 11; stroke-linecap: round;
+  filter: drop-shadow(0 0 7px var(--glow-a));
+  transition: stroke-dashoffset 1.1s cubic-bezier(.2,.75,.25,1);
+}
+.ring-mid { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.hero-figure { font-size: 3.1rem; font-weight: 660; letter-spacing: -.035em; line-height: 1; }
+.hero-figure small { font-size: .9rem; font-weight: 550; color: var(--ink-3); letter-spacing: 0; }
+.ring-mid .cap { font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); font-weight: 600; }
+.hero-body { flex: 1 1 260px; min-width: 240px; }
+.tier {
+  display: inline-flex; align-items: center; gap: 7px; font-size: .78rem; font-weight: 600;
+  padding: 4px 11px; border-radius: 999px; margin-bottom: 10px;
+  background: var(--surface-2); border: 1px solid var(--border-2);
+}
+.tier .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+
+/* ---------- 7b. Icons & ornament ---------- */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.icon {
+  width: 1.15em; height: 1.15em; flex: none; display: inline-block; vertical-align: -.2em;
+  fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.crest .icon { width: 25px; height: 25px; color: #fff; stroke-width: 1.5; }
+.item .lead .icon { width: 19px; height: 19px; color: var(--seq-450); }
+.tier .icon { width: 15px; height: 15px; }
+.streak .icon { width: 16px; height: 16px; color: var(--s2); }
+.btn .icon { width: 15px; height: 15px; }
+
+/* Chevron band behind the header — rank-stripe motif, deliberately faint. */
+.top { position: relative; }
+.hdr-ornament {
+  position: absolute; inset: -8px -12px auto; height: 74px; width: calc(100% + 24px);
+  z-index: -1; pointer-events: none; opacity: .9;
+}
+.hdr-ornament path { fill: none; stroke: var(--ornament); stroke-width: 2.4; stroke-linecap: round; }
+
+/* ---------- 8. Stat tiles (KPI row) ---------- */
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); }
+.kpi {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 13px 14px; box-shadow: var(--shadow-1); min-width: 0;
+  transition: transform .18s, box-shadow .18s;
+}
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+.kpi .label { font-size: .74rem; color: var(--ink-2); font-weight: 550; display: block; margin-bottom: 3px; }
+.kpi .value { font-size: 1.62rem; font-weight: 640; letter-spacing: -.03em; line-height: 1.1; display: block; }
+.kpi .value .unit { font-size: .82rem; font-weight: 550; color: var(--ink-3); letter-spacing: 0; }
+/* Trend on its own line, delta below it — six tiles across is too narrow to
+   share one row without truncating the delta. The reserved sparkline strip keeps
+   tiles with and without a trend the same shape. */
+.kpi .trend { min-height: 22px; margin-top: 7px; }
+.kpi .foot { display: flex; align-items: center; gap: 8px; margin-top: 3px; min-height: 20px; min-width: 0; }
+/* The delta wraps rather than truncating — a clipped "vs previous term" hides
+   the comparison the number depends on. Grid stretch keeps a row level. */
+.kpi .delta { font-size: .74rem; font-weight: 600; line-height: 1.32; min-width: 0; overflow-wrap: break-word; }
+.kpi .delta.up { color: var(--good-text); }
+.kpi .delta.down { color: var(--critical); }
+.kpi .delta.flat { color: var(--ink-3); }
+.kpi .spark { display: block; flex: none; }
+
+/* ---------- 9. Meters ---------- */
+.meters { display: grid; gap: 13px; grid-template-columns: minmax(0, 1fr); }
+.meter-row { min-width: 0; }
+.meter-row .top-line { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: .82rem; margin-bottom: 5px; }
+.meter-row .top-line .name { font-weight: 550; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meter-row .top-line .val { flex: none; color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meter { height: 9px; border-radius: 999px; background: var(--seq-100); overflow: hidden; }
+.meter > i { display: block; height: 100%; border-radius: 999px; background: var(--seq-450); transition: width .9s cubic-bezier(.2,.75,.25,1); }
+.meter.is-warning > i { background: var(--warning); }
+.meter.is-critical > i { background: var(--critical); }
+.meter.is-good > i { background: var(--good); }
+.meter-note { font-size: .74rem; color: var(--ink-3); margin-top: 4px; }
+
+/* ---------- 10. Charts ---------- */
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gridline { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+.axisline { stroke: var(--axis); stroke-width: 1; shape-rendering: crispEdges; }
+.tick { font-size: 10px; fill: var(--ink-3); font-variant-numeric: tabular-nums; }
+.tick.mid { text-anchor: middle; }
+.tick.end { text-anchor: end; }
+.dlabel { font-size: 11px; font-weight: 600; fill: var(--ink); }
+.dlabel.mid { text-anchor: middle; }
+.dlabel.soft { fill: var(--ink-2); font-weight: 550; }
+.series-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.series-dot { stroke: var(--surface); stroke-width: 2; }
+.area-wash { stroke: none; opacity: .10; }
+.bar { rx: 4; }
+.hit { fill: transparent; cursor: pointer; }
+.hover-rule { stroke: var(--axis); stroke-width: 1; pointer-events: none; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--ink-2); }
+.legend .key { width: 14px; height: 3px; border-radius: 2px; flex: none; }
+.legend .key.sq { width: 10px; height: 10px; border-radius: 3px; }
+
+.tip {
+  position: absolute; z-index: 20; pointer-events: none; opacity: 0;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-2);
+  border-radius: var(--r-sm); padding: 8px 10px; font-size: .76rem; line-height: 1.45;
+  box-shadow: var(--shadow-2); transform: translate(-50%, -114%); white-space: nowrap;
+  transition: opacity .12s;
+}
+.tip.on { opacity: 1; }
+.tip b { font-weight: 650; }
+.tip .row { display: flex; align-items: center; gap: 6px; }
+.tip .row i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.tip .row .n { color: var(--ink-2); }
+.tip .row .v { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* small multiples */
+.multiples { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(212px, 1fr)); }
+.mult {
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 13px;
+  background: var(--surface); min-width: 0; display: flex; flex-direction: column;
+}
+.mult .name { font-size: .78rem; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.mult .name > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mult .name .cur { flex: none; font-size: 1.12rem; font-weight: 640; letter-spacing: -.02em; }
+.mult .goal-note { font-size: .72rem; color: var(--ink-3); margin: 2px 0 6px; }
+.mult .spark { display: block; margin: 0 0 4px; }
+.mult .mult-foot { margin-top: auto; padding-top: 6px; }
+
+/* ---------- 11. Tables ---------- */
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .84rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+th { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 620; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--surface-2); }
+td.actions { width: 1%; }
+.actions { text-align: right; white-space: nowrap; }
+.table-view[hidden] { display: none; }
+
+/* ---------- 12. Chips, badges, lists ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 600;
+  padding: 2px 9px; border-radius: 999px; background: var(--surface-2);
+  border: 1px solid var(--border); color: var(--ink-2); white-space: nowrap;
+}
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.chip.solid { color: #fff; border-color: transparent; }
+.grade { font-weight: 660; font-variant-numeric: tabular-nums; }
+
+.items { display: grid; gap: 9px; grid-template-columns: minmax(0, 1fr); }
+.item {
+  display: flex; gap: 12px; align-items: flex-start; padding: 11px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface);
+  transition: border-color .16s, transform .16s;
+}
+.item:hover { border-color: var(--border-2); transform: translateX(2px); }
+.item .lead { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); }
+.item .body { flex: 1 1 auto; min-width: 0; }
+.item .t { font-size: .88rem; font-weight: 600; }
+.item .m { font-size: .77rem; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; align-items: center; }
+.item .m em { font-style: normal; color: var(--ink-3); }
+.item .side { flex: none; display: flex; gap: 4px; align-items: center; }
+.item.stack { flex-direction: column; align-items: stretch; gap: 10px; }
+.item-row { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+
+/* timeline rail */
+.timeline { position: relative; padding-left: 22px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.timeline::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 1px; background: var(--grid); }
+.timeline > .item { position: relative; }
+.timeline > .item::before {
+  content: ""; position: absolute; left: -20px; top: 18px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--seq-450); box-shadow: 0 0 0 2px var(--surface), 0 0 8px var(--glow-a);
+}
+
+.checks { display: grid; gap: 6px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.checks.indent { padding-left: 46px; }
+@media (max-width: 560px) { .checks.indent { padding-left: 4px; } }
+.check { display: flex; gap: 9px; align-items: flex-start; font-size: .83rem; padding: 4px 0; min-width: 0; }
+.check label { min-width: 0; overflow-wrap: anywhere; }
+.check input { margin-top: 3px; flex: none; width: 16px; height: 16px; accent-color: var(--seq-450); cursor: pointer; }
+.check.done label { color: var(--ink-3); text-decoration: line-through; }
+.check label { cursor: pointer; }
+
+.empty {
+  text-align: center; padding: 26px 16px; border: 1px dashed var(--border-2);
+  border-radius: var(--r-md); color: var(--ink-2); font-size: .84rem;
+}
+.empty strong { display: block; color: var(--ink); font-size: .9rem; margin-bottom: 3px; font-weight: 600; }
+
+.streak {
+  display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600;
+  padding: 5px 12px; border-radius: 999px; background: var(--surface);
+  border: 1px solid var(--border-2); box-shadow: var(--shadow-1);
+}
+.streak .n { font-variant-numeric: tabular-nums; }
+
+/* ---------- 13. Forms & modal ---------- */
+dialog {
+  max-height: 90vh; overflow: auto;
+  border: 1px solid var(--border-2); border-radius: var(--r-lg); padding: 0;
+  background: var(--surface); color: var(--ink); max-width: 540px; width: calc(100% - 28px);
+  box-shadow: var(--shadow-2);
+}
+dialog::backdrop { background: rgba(11, 11, 11, .55); backdrop-filter: blur(3px); }
+dialog form { padding: 20px; }
+dialog h2 { font-size: 1.02rem; font-weight: 640; margin-bottom: 2px; }
+dialog .sub { margin-bottom: 16px; }
+.fields { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+.field label { font-size: .76rem; font-weight: 600; color: var(--ink-2); }
+.field .hint { font-size: .72rem; color: var(--ink-3); }
+input:not([type="checkbox"]), select, textarea {
+  font: inherit; font-size: .86rem; color: var(--ink); background: var(--plane);
+  border: 1px solid var(--border-2); border-radius: var(--r-sm); padding: 8px 10px; width: 100%;
+  min-height: 38px;
+}
+textarea { min-height: 68px; resize: vertical; }
+input:not([type="checkbox"]):focus, select:focus, textarea:focus { outline: 2px solid var(--seq-450); outline-offset: 0; border-color: var(--seq-450); }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--seq-450); outline-offset: 2px; }
+.dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+.dialog-actions .spacer { margin-right: auto; }
+@media (max-width: 520px) { .fields { grid-template-columns: 1fr; } }
+
+
+/* ---------- 13b. Sync chip ---------- */
+.sync-chip {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: .78rem; font-weight: 600;
+  padding: 5px 12px; border-radius: 999px; background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--border-2); box-shadow: var(--shadow-1); cursor: pointer; min-height: 34px;
+  transition: background .16s, border-color .16s, color .16s;
+}
+.sync-chip:hover { background: var(--surface-2); color: var(--ink); }
+.sync-chip:focus-visible { outline: 2px solid var(--seq-450); outline-offset: 2px; }
+.sync-chip .icon { width: 15px; height: 15px; }
+.sync-chip[data-state="ok"]      { color: var(--good-text); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+.sync-chip[data-state="working"] { color: var(--seq-450); }
+.sync-chip[data-state="working"] .icon { animation: spin 1.1s linear infinite; }
+.sync-chip[data-state="error"]   { color: var(--critical); border-color: color-mix(in srgb, var(--critical) 45%, transparent); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.setup-steps { counter-reset: st; display: grid; gap: 9px; margin: 4px 0 14px; }
+.setup-steps li { display: flex; gap: 9px; font-size: .82rem; line-height: 1.5; color: var(--ink-2); align-items: flex-start; list-style: none; }
+.setup-steps li > span { min-width: 0; }
+.setup-steps li::before {
+  counter-increment: st; content: counter(st); flex: none;
+  width: 20px; height: 20px; border-radius: 50%; background: var(--seq-450); color: #fff;
+  font-size: .7rem; font-weight: 700; display: grid; place-items: center; margin-top: 1px;
+}
+.setup-steps code, .sub code {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px;
+  padding: 1px 5px; font-size: .92em; overflow-wrap: anywhere;
+}
+
+/* ---------- 14. Toast & confetti ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 140%); z-index: 60;
+  background: var(--ink); color: var(--plane); font-size: .84rem; font-weight: 550;
+  padding: 10px 18px; border-radius: 999px; box-shadow: var(--shadow-2);
+  transition: transform .32s cubic-bezier(.2,.8,.25,1); max-width: calc(100% - 32px);
+}
+.toast.on { transform: translate(-50%, 0); }
+.confetti { position: fixed; inset: 0; z-index: 55; pointer-events: none; overflow: hidden; }
+.confetti i {
+  position: absolute; width: 8px; height: 8px; border-radius: 2px;
+  animation: fall 1.5s cubic-bezier(.25,.6,.4,1) forwards;
+}
+@keyframes fall { to { transform: translate3d(var(--dx), 78vh, 0) rotate(var(--rot)); opacity: 0; } }
+
+/* ---------- 15. Motion & print ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  .aurora i { animation: none; }
+}
+@media print {
+  .aurora, .tabs, .top-actions, .btn, td.actions, .actions, .tip { display: none !important; }
+  .panel[hidden] { display: block !important; }
+  body { background: #fff; }
+  .card { box-shadow: none; break-inside: avoid; }
+}
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+<!-- Google Identity Services. Loaded async: if it is blocked or offline the
+     dashboard still works, it just cannot sync. -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<!-- Icon sprite: one 24x24 line set, stroked in currentColor so every icon
+     inherits the purple theme and both light/dark modes for free. -->
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<g id="ic-shield"><path d="M12 3.2l7.2 2.9v5.2c0 4.5-3 8.2-7.2 9.4-4.2-1.2-7.2-4.9-7.2-9.4V6.1z"/><path d="M12 8.4l1.3 2.7 2.9.4-2.1 2 .5 2.9-2.6-1.4-2.6 1.4.5-2.9-2.1-2 2.9-.4z"/></g>
+<g id="ic-medal"><path d="M8.4 3.2v3.9l3.6 2.3 3.6-2.3V3.2"/><circle cx="12" cy="15" r="5.6"/><circle cx="12" cy="15" r="2.2"/></g>
+<g id="ic-book"><path d="M12 6.4C10.1 4.9 7.6 4.3 5 4.3v12.9c2.6 0 5.1.6 7 2.1 1.9-1.5 4.4-2.1 7-2.1V4.3c-2.6 0-5.1.6-7 2.1z"/><path d="M12 6.4v12.9"/></g>
+<g id="ic-trophy"><path d="M7.4 3.8h9.2v5.6a4.6 4.6 0 0 1-9.2 0z"/><path d="M7.4 5.6H4.5v1.6a3.4 3.4 0 0 0 3.4 3.4M16.6 5.6h2.9v1.6a3.4 3.4 0 0 1-3.4 3.4"/><path d="M12 14v3.2M8.4 20.2h7.2l-.8-3h-5.6z"/></g>
+<g id="ic-star"><path d="M12 3.6l2.6 5.3 5.8.9-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.9z"/></g>
+<g id="ic-heart"><path d="M12 19.9l-1.5-1.4C6 14.4 3.7 12.2 3.7 9.4A4.6 4.6 0 0 1 8.3 4.8c1.5 0 2.9.7 3.7 1.9a4.7 4.7 0 0 1 3.7-1.9 4.6 4.6 0 0 1 4.6 4.6c0 2.8-2.3 5-6.8 9.1z"/></g>
+<g id="ic-palette"><path d="M12 3.8a8.2 8.2 0 0 0 0 16.4c1.2 0 1.9-.8 1.9-1.7 0-1.3-1-1.6-1-2.6 0-.8.7-1.4 1.6-1.4h1.6a4.1 4.1 0 0 0 4.1-4.1c0-3.7-3.6-6.6-8.2-6.6z"/><circle cx="8.4" cy="10.2" r="1"/><circle cx="12" cy="8.2" r="1"/><circle cx="15.6" cy="10" r="1"/></g>
+<g id="ic-certificate"><rect x="4" y="4.4" width="16" height="11.4" rx="1.8"/><path d="M8.2 8.6h7.6M8.2 11.6h4.6"/><path d="M9.4 15.8L8.6 20.4l3.4-1.8 3.4 1.8-.8-4.6"/></g>
+<g id="ic-sparkle"><path d="M12 3.4l1.8 5.1 5.1 1.8-5.1 1.8L12 17.2l-1.8-5.1L5.1 10.3l5.1-1.8z"/><path d="M18.4 15.6l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></g>
+<g id="ic-target"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r="1.2"/></g>
+<g id="ic-cap"><path d="M2.6 9.2L12 5.1l9.4 4.1-9.4 4.1z"/><path d="M6.4 11v4.3c0 1.5 2.5 2.7 5.6 2.7s5.6-1.2 5.6-2.7V11"/><path d="M21.4 9.2v5.2"/></g>
+<g id="ic-check"><circle cx="12" cy="12" r="8.4"/><path d="M8.2 12.3l2.7 2.7 5-5.3"/></g>
+<g id="ic-flame"><path d="M12 20.8c3.7 0 5.9-2.4 5.9-5.5 0-3.6-3-5-4.2-8.4-1 1.4-1.4 2.6-1.1 4.1-1-.6-1.6-1.7-1.8-3.1-2.4 2-4.7 4-4.7 7.4 0 3.1 2.2 5.5 5.9 5.5z"/></g>
+<g id="ic-dumbbell"><path d="M4.2 9.2v5.6M7.4 6.8v10.4M16.6 6.8v10.4M19.8 9.2v5.6M7.4 12h9.2"/></g>
+<g id="ic-cloud"><path d="M7 18.4a4 4 0 0 1-.4-8 5.4 5.4 0 0 1 10.3 1.2A3.6 3.6 0 0 1 16.6 18.4z"/><path d="M12 11.6v6M9.8 15.4L12 17.6l2.2-2.2"/></g>
+<g id="ic-user"><circle cx="12" cy="8.4" r="3.8"/><path d="M5.2 20c.7-3.5 3.5-5.5 6.8-5.5s6.1 2 6.8 5.5"/></g>
+</defs></svg>
+
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<div class="wrap">
+
+  <!-- ============ Header ============ -->
+  <header class="top">
+    <svg class="hdr-ornament" aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 600 60"></svg>
+    <div class="brand">
+      <div class="crest" aria-hidden="true"><svg class="icon"><use href="#ic-shield"/></svg></div>
+      <div>
+        <h1 id="hdrName">Progress Command Center</h1>
+        <p class="sub" id="hdrMeta">Academics · Fitness · Leadership · Goals</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="streak" id="streakChip" title="Consecutive days you have updated this dashboard">
+        <svg class="icon" aria-hidden="true"><use href="#ic-flame"/></svg><span class="n" id="streakN">0</span>&nbsp;day streak
+      </span>
+      <button class="sync-chip" id="syncChip" type="button" data-state="off" title="Google Drive sync">
+        <svg class="icon" aria-hidden="true"><use href="#ic-cloud"/></svg><span id="syncLabel">Sync off</span>
+      </button>
+      <button class="btn" id="btnProfile" type="button">Profile</button>
+      <button class="btn" id="btnSave" type="button" title="Download a JSON backup of everything on this dashboard">Backup</button>
+      <button class="btn" id="btnLoad" type="button" title="Restore from a JSON backup file">Restore</button>
+      <button class="btn ghost" id="btnTheme" type="button" title="Switch light / dark" aria-label="Switch light or dark theme">◐</button>
+    </div>
+  </header>
+
+  <!-- ============ Tabs ============ -->
+  <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+    <button class="tab" role="tab" id="tab-overview"   aria-controls="p-overview"   aria-selected="true">Overview</button>
+    <button class="tab" role="tab" id="tab-academics"  aria-controls="p-academics"  aria-selected="false">Academics</button>
+    <button class="tab" role="tab" id="tab-fitness"    aria-controls="p-fitness"    aria-selected="false">Fitness &amp; PT</button>
+    <button class="tab" role="tab" id="tab-activities" aria-controls="p-activities" aria-selected="false">Sports &amp; Service</button>
+    <button class="tab" role="tab" id="tab-awards"     aria-controls="p-awards"     aria-selected="false">Awards</button>
+    <button class="tab" role="tab" id="tab-goals"      aria-controls="p-goals"      aria-selected="false">Goals &amp; College</button>
+  </nav>
+
+  <!-- ============ Overview ============ -->
+  <section class="panel" id="p-overview" role="tabpanel" aria-labelledby="tab-overview">
+    <div class="kpis" id="kpiRow" style="margin-bottom:14px"></div>
+
+    <div class="grid">
+      <div class="card span-5">
+        <div class="card-head"><h2>Readiness score</h2></div>
+        <p class="sub">One number across all five pillars, recomputed as you log progress.</p>
+        <div class="hero">
+          <div class="ring-wrap">
+            <svg class="wreath" viewBox="0 0 200 200" aria-hidden="true" id="wreathSvg"></svg>
+            <svg class="ring-svg" viewBox="0 0 168 168" role="img" aria-labelledby="ringTitle">
+              <title id="ringTitle">Overall readiness score</title>
+              <defs>
+                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%"   stop-color="var(--seq-550)"/>
+                  <stop offset="55%"  stop-color="var(--seq-450)"/>
+                  <stop offset="100%" stop-color="var(--seq-250)"/>
+                </linearGradient>
+              </defs>
+              <circle class="ring-track" cx="84" cy="84" r="72"></circle>
+              <circle class="ring-fill" id="ringFill" cx="84" cy="84" r="72"
+                      stroke-dasharray="452.4" stroke-dashoffset="452.4"></circle>
+            </svg>
+            <div class="ring-mid">
+              <div class="hero-figure" id="heroScore">0<small>/100</small></div>
+              <div class="cap">Readiness</div>
+            </div>
+          </div>
+          <div class="hero-body">
+            <span class="tier" id="tierChip"><span class="dot"></span><span class="txt">Getting started</span></span>
+            <p class="sub" id="tierNote">Add your GPA, a PT score and a goal to bring this to life.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card span-7">
+        <div class="card-head"><h2>Where the points come from</h2><span class="sub">weighted pillars</span></div>
+        <p class="sub">Each bar is that pillar's share of the 100 — the shortest bar is your best next move.</p>
+        <div class="meters" id="pillarMeters"></div>
+      </div>
+
+      <div class="card span-7">
+        <div class="card-head"><h2>GPA by term</h2>
+          <button class="btn tiny ghost" type="button" data-toggle-table="gpaTable" aria-pressed="false">Table</button>
+        </div>
+        <p class="sub">Weighted and unweighted, one point per grading term.</p>
+        <div id="gpaChart"></div>
+        <div class="table-view" id="gpaTable" hidden></div>
+      </div>
+
+      <div class="card span-5">
+        <div class="card-head"><h2>Up next</h2><span class="sub">soonest first</span></div>
+        <p class="sub">Deadlines pulled from your goals and college targets.</p>
+        <div id="upNext"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Active goals</h2>
+          <button class="btn tiny" type="button" data-goto="goals">Manage goals</button>
+        </div>
+        <p class="sub">Progress toward every goal you have not finished yet.</p>
+        <div class="meters" id="overviewGoals"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Academics ============ -->
+  <section class="panel" id="p-academics" role="tabpanel" aria-labelledby="tab-academics" hidden>
+    <div class="kpis" id="acadKpis" style="margin-bottom:14px"></div>
+
+    <div class="grid">
+      <div class="card span-7">
+        <div class="card-head"><h2>Term GPA trend</h2>
+          <button class="btn tiny" type="button" data-add="terms">+ Add term</button>
+        </div>
+        <p class="sub">Log one row per semester or quarter — this drives the academics pillar.</p>
+        <div id="termChart"></div>
+        <div id="termList" style="margin-top:14px"></div>
+      </div>
+
+      <div class="card span-5">
+        <div class="card-head"><h2>Test scores</h2>
+          <button class="btn tiny" type="button" data-add="tests">+ Add score</button>
+        </div>
+        <p class="sub">SAT, ACT, PSAT, AP exams, ASVAB. Your best score counts toward readiness.</p>
+        <div id="testList"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Courses</h2>
+          <button class="btn tiny" type="button" data-add="courses">+ Add course</button>
+        </div>
+        <p class="sub">Course rigor — AP, honours and dual-enrolment counts — is what admissions boards read first.</p>
+        <div id="courseTable"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Fitness ============ -->
+  <section class="panel" id="p-fitness" role="tabpanel" aria-labelledby="tab-fitness" hidden>
+    <div class="kpis" id="fitKpis" style="margin-bottom:14px"></div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><h2>PT events</h2>
+          <div style="display:flex;gap:6px">
+            <button class="btn tiny primary" type="button" data-add="fitlog">+ Log a test</button>
+            <button class="btn tiny" type="button" data-add="fitevents">+ Add event</button>
+          </div>
+        </div>
+        <p class="sub">One panel per event: your latest result, the trend, and how close you are to your goal.</p>
+        <div class="multiples" id="fitMultiples"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Test log</h2>
+          <button class="btn tiny ghost" type="button" data-flag="fitAll" aria-pressed="false">Show all</button>
+        </div>
+        <p class="sub">Every recorded result, newest first. Times use mm:ss — reps and points are plain numbers.</p>
+        <div id="fitLog"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Sports & Service ============ -->
+  <section class="panel" id="p-activities" role="tabpanel" aria-labelledby="tab-activities" hidden>
+    <div class="kpis" id="actKpis" style="margin-bottom:14px"></div>
+
+    <div class="grid">
+      <div class="card span-6">
+        <div class="card-head"><h2>Sports</h2>
+          <button class="btn tiny" type="button" data-add="sports">+ Add season</button>
+        </div>
+        <p class="sub">One entry per sport per season, with the achievements that came out of it.</p>
+        <div id="sportList"></div>
+      </div>
+
+      <div class="card span-6">
+        <div class="card-head"><h2>Leadership roles</h2>
+          <button class="btn tiny" type="button" data-add="roles">+ Add role</button>
+        </div>
+        <p class="sub">Cadet chain-of-command billets, team captaincies, club offices, jobs.</p>
+        <div id="roleList"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Service hours</h2>
+          <div style="display:flex;gap:6px">
+            <button class="btn tiny primary" type="button" data-add="service">+ Log hours</button>
+            <button class="btn tiny ghost" type="button" data-toggle-table="svcTable" aria-pressed="false">Table</button>
+          </div>
+        </div>
+        <p class="sub">Hours per month. ROTC scholarship boards and college applications both ask for this total.</p>
+        <div id="svcChart"></div>
+        <div class="table-view" id="svcTable" hidden></div>
+        <div id="svcList" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Awards ============ -->
+  <section class="panel" id="p-awards" role="tabpanel" aria-labelledby="tab-awards" hidden>
+    <div class="kpis" id="awardKpis" style="margin-bottom:14px"></div>
+
+    <div class="grid">
+      <div class="card span-5">
+        <div class="card-head"><h2>By recognition level</h2></div>
+        <p class="sub">Reach matters more than raw count — a state medal outweighs three classroom certificates.</p>
+        <div id="awardLevels"></div>
+      </div>
+
+      <div class="card span-7">
+        <div class="card-head"><h2>Accomplishment timeline</h2>
+          <button class="btn tiny primary" type="button" data-add="awards">+ Add award</button>
+        </div>
+        <p class="sub">Ribbons, medals, honour roll, competitions, promotions, certifications — newest first.</p>
+        <div id="awardList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Goals & College ============ -->
+  <section class="panel" id="p-goals" role="tabpanel" aria-labelledby="tab-goals" hidden>
+    <div class="grid">
+      <div class="card">
+        <div class="card-head"><h2>Goals</h2>
+          <button class="btn tiny primary" type="button" data-add="goals">+ Add goal</button>
+        </div>
+        <p class="sub">Give each goal a number to hit and a date. Tick milestones as you clear them.</p>
+        <div id="goalList"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>College &amp; ROTC targets</h2>
+          <button class="btn tiny primary" type="button" data-add="college">+ Add target</button>
+        </div>
+        <p class="sub">Schools, service academies and scholarship programmes, each with its own requirement checklist.</p>
+        <div id="collegeList"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Google Drive sync</h2><span class="sub" id="syncStatusLine">Not connected</span></div>
+        <p class="sub">
+          Connect a Google account and your record is kept in a private folder in your own Drive — it survives
+          clearing your browser, and any device you sign in on picks up where you left off. The app can only see
+          the one file it creates; it has no access to the rest of your Drive.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px" id="syncButtons"></div>
+        <p class="sub" id="syncDetail" style="margin-top:12px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Data &amp; privacy</h2></div>
+        <p class="sub">
+          Everything you type is written to this browser's local storage. With Google Drive sync switched off the
+          page makes no network requests at all; switch it on and the only thing sent anywhere is your own record,
+          to your own Drive. The page itself is published publicly, so anyone opening the link sees an empty
+          dashboard, never your entries.
+        </p>
+        <p class="sub" style="margin-top:8px">
+          To move your record between devices, use <strong>Backup</strong> to download a JSON file, keep it
+          somewhere private — email it to yourself, or drop it in iCloud or Drive — and load it with
+          <strong>Restore</strong>. <strong>Never commit a backup into a public repo:</strong> the file is your
+          actual record, unlike this page.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn primary" id="btnSave2" type="button">Download backup</button>
+          <button class="btn" id="btnLoad2" type="button">Restore from file</button>
+          <button class="btn" id="btnSeed" type="button">Load example data</button>
+          <button class="btn danger" id="btnWipe" type="button">Erase everything</button>
+        </div>
+        <p class="sub" id="storeMeta" style="margin-top:12px"></p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ Editor dialog ============ -->
+<dialog id="dlg">
+  <form id="dlgForm" method="dialog">
+    <h2 id="dlgTitle">Edit</h2>
+    <p class="sub" id="dlgSub"></p>
+    <div class="fields" id="dlgFields"></div>
+    <div class="dialog-actions">
+      <button class="btn danger spacer" type="button" id="dlgDelete" hidden>Delete</button>
+      <button class="btn ghost" type="button" id="dlgCancel">Cancel</button>
+      <button class="btn primary" type="submit" id="dlgSubmit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<input type="file" id="filePick" accept="application/json,.json" class="sr" aria-hidden="true">
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+"use strict";
+/* ============================================================
+   Progress Command Center — application logic
+   Plain JS, no dependencies, no network calls.
+   Data model -> score -> charts -> renderers -> editor -> init
+   ============================================================ */
+
+/* ---------- 0. Small utilities ---------- */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+const clamp = (n, a = 0, b = 1) => Math.min(b, Math.max(a, n));
+const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const today = () => new Date().toISOString().slice(0, 10);
+
+function fmtNum(n, dp = 0) {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  return n.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+}
+function compact(n) {
+  if (!Number.isFinite(n)) return "—";
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+  if (Math.abs(n) >= 1e4) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+  return fmtNum(n);
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  const t = new Date(d + "T12:00:00");
+  if (isNaN(t)) return esc(d);
+  return t.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+function monthKey(d) { return (d || "").slice(0, 7); }
+function fmtMonth(k) {
+  if (!k) return "—";
+  const t = new Date(k + "-01T12:00:00");
+  return isNaN(t) ? k : t.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+}
+function daysUntil(d) {
+  if (!d) return null;
+  const t = new Date(d + "T12:00:00"); if (isNaN(t)) return null;
+  return Math.round((t - new Date().setHours(12, 0, 0, 0)) / 864e5);
+}
+/* Times are stored in seconds. Display mm:ss above a minute, seconds below. */
+function fmtTime(sec) {
+  if (!Number.isFinite(sec)) return "—";
+  if (sec < 60) return (Math.round(sec * 10) / 10) + "s";
+  const m = Math.floor(sec / 60), s = sec - m * 60;
+  return m + ":" + (s < 10 ? "0" : "") + (Math.round(s * 10) / 10);
+}
+function parseTimeInput(v) {
+  if (v === "" || v === null || v === undefined) return null;
+  const str = String(v).trim();
+  if (str.includes(":")) {
+    const [m, s] = str.split(":");
+    const mm = parseFloat(m), ss = parseFloat(s);
+    if (!Number.isFinite(mm) || !Number.isFinite(ss)) return null;
+    return mm * 60 + ss;
+  }
+  return num(str);
+}
+
+/* ---------- 1. Reference data ---------- */
+const TERM_ORDER = ["Fall", "Winter", "Spring", "Summer", "Full year"];   // dropdown order (school-year feel)
+const TERM_SORT = { Winter: 0, Spring: 1, Summer: 2, Fall: 3, "Full year": 4 }; // chronological within a calendar year
+const COURSE_LEVELS = ["AP", "IB", "Dual enrollment", "Honors", "Regular", "Elective"];
+const RIGOR_LEVELS = ["AP", "IB", "Dual enrollment", "Honors"];
+const AWARD_LEVELS = ["School", "District", "State", "National"];
+const AWARD_WEIGHT = { School: 1, District: 2, State: 4, National: 5 };
+const AWARD_CATS = ["JROTC", "Academic", "Athletic", "Leadership", "Service", "Arts", "Certification", "Other"];
+const SPORT_LEVELS = ["Varsity", "Junior varsity", "Freshman", "Club", "Travel", "Intramural"];
+const GOAL_CATS = ["Academics", "Fitness", "Leadership", "Service", "Athletics", "College", "Personal"];
+const COLLEGE_STATUS = ["Researching", "Visited", "In progress", "Applied", "Interviewed", "Accepted", "Enrolled", "Declined"];
+const TEST_TYPES = ["SAT", "ACT", "PSAT/NMSQT", "AP exam", "ASVAB", "CLT", "Other"];
+const TEST_RANGE = { "SAT": [400, 1600], "PSAT/NMSQT": [320, 1520], "ACT": [1, 36], "AP exam": [1, 5], "ASVAB": [1, 99], "CLT": [0, 120] };
+const ICONS = { JROTC: "medal", Academic: "book", Athletic: "trophy", Leadership: "star",
+                Service: "heart", Arts: "palette", Certification: "certificate", Other: "sparkle" };
+const icon = (name, cls) => `<svg class="icon${cls ? " " + cls : ""}" aria-hidden="true"><use href="#ic-${name}"/></svg>`;
+
+const PILLARS = [
+  { k: "academics",  name: "Academics",             weight: 30, hint: "GPA, course rigour, test scores" },
+  { k: "fitness",    name: "Fitness & PT",          weight: 20, hint: "PT events against your goals" },
+  { k: "leadership", name: "Leadership & service",  weight: 20, hint: "Billets, offices, service hours" },
+  { k: "awards",     name: "Awards & athletics",    weight: 15, hint: "Recognition reach, varsity seasons" },
+  { k: "goals",      name: "Goal follow-through",   weight: 15, hint: "Average progress on your own goals" }
+];
+
+/* Default PT events span the JROTC Cadet Challenge and the Army ROTC/APFT staples. */
+function defaultEvents() {
+  return [
+    { id: uid(), name: "Push-ups",     unit: "reps",  lower: false, goal: 60,   note: "1 minute, chest to fist" },
+    { id: uid(), name: "Curl-ups",     unit: "reps",  lower: false, goal: 70,   note: "1 minute" },
+    { id: uid(), name: "Pull-ups",     unit: "reps",  lower: false, goal: 12,   note: "Dead hang, no kipping" },
+    { id: uid(), name: "One-mile run", unit: "time",  lower: true,  goal: 390,  note: "Cadet Challenge event" },
+    { id: uid(), name: "Two-mile run", unit: "time",  lower: true,  goal: 840,  note: "APFT / ROTC event" },
+    { id: uid(), name: "Shuttle run",  unit: "time",  lower: true,  goal: 9.5,  note: "4 × 30 ft" }
+  ];
+}
+function defaultROTCChecklist() {
+  return ["Create the ROTC scholarship application account", "Ask for teacher and cadet-cadre recommendations",
+    "Send official transcript", "Record a qualifying PT / fitness assessment", "Complete the interview with a recruiting officer",
+    "Start the DoDMERB medical exam", "Write and edit the personal statement"];
+}
+function defaultState() {
+  return {
+    version: 1,
+    profile: { name: "", school: "", gradYear: null, branch: "", rank: "", classSize: null, classRank: null },
+    academics: { terms: [], courses: [], tests: [] },
+    fitness: { events: defaultEvents(), log: [] },
+    activities: { sports: [], roles: [], service: [] },
+    awards: [],
+    goals: [],
+    college: [],
+    meta: { created: today(), updated: today(), days: [today()] }
+  };
+}
+
+/* ---------- 2. Storage ---------- */
+const KEY = "pcc.progress.v1";
+let state = defaultState();
+let ui = { tab: "overview", fitAll: false };
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { state = migrate(JSON.parse(raw)); return true; }
+  } catch (e) { console.warn("Could not read saved progress:", e); }
+  return false;
+}
+function migrate(s) {
+  const d = defaultState();
+  const out = Object.assign(d, s);
+  out.profile   = Object.assign(d.profile, s.profile || {});
+  out.academics = Object.assign({ terms: [], courses: [], tests: [] }, s.academics || {});
+  out.fitness   = Object.assign({ events: defaultEvents(), log: [] }, s.fitness || {});
+  out.activities = Object.assign({ sports: [], roles: [], service: [] }, s.activities || {});
+  out.meta      = Object.assign(d.meta, s.meta || {});
+  for (const k of ["awards", "goals", "college"]) if (!Array.isArray(out[k])) out[k] = [];
+  return out;
+}
+function save(quiet) {
+  const t = today();
+  state.meta.updated = t;
+  state.meta.days = [...new Set([...(state.meta.days || []), t])].sort().slice(-400);
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    queuePush();
+    if (!quiet) toast("Saved");
+  } catch (e) {
+    toast("Could not save — storage may be full or blocked");
+    console.error(e);
+  }
+}
+function streak() {
+  const days = [...new Set(state.meta.days || [])].sort().reverse();
+  if (!days.length) return 0;
+  const d0 = new Date(today() + "T12:00:00");
+  const first = new Date(days[0] + "T12:00:00");
+  const gap = Math.round((d0 - first) / 864e5);
+  if (gap > 1) return 0;
+  let n = 1, prev = first;
+  for (let i = 1; i < days.length; i++) {
+    const cur = new Date(days[i] + "T12:00:00");
+    if (Math.round((prev - cur) / 864e5) === 1) { n++; prev = cur; } else break;
+  }
+  return n;
+}
+
+/* ---------- 3. Derived values ---------- */
+const sortedTerms = () => [...state.academics.terms].sort((a, b) =>
+  ((a.year || 0) - (b.year || 0)) || ((TERM_SORT[a.term] ?? 9) - (TERM_SORT[b.term] ?? 9)));
+const termLabel = t => `${t.term || ""} ${t.year || ""}`.trim() || "Term";
+
+function latestGpa(key) {
+  const t = sortedTerms().filter(x => Number.isFinite(x[key]));
+  return t.length ? t[t.length - 1][key] : null;
+}
+function cumulativeGpa(key) {
+  const t = sortedTerms().filter(x => Number.isFinite(x[key]));
+  if (!t.length) return null;
+  return t.reduce((s, x) => s + x[key], 0) / t.length;
+}
+function rigorCount() {
+  return state.academics.courses.filter(c => RIGOR_LEVELS.includes(c.level)).length;
+}
+function testNorm(t) {
+  const r = TEST_RANGE[t.name];
+  const max = Number.isFinite(t.max) ? t.max : (r ? r[1] : null);
+  const min = r ? r[0] : 0;
+  if (!Number.isFinite(t.score) || !Number.isFinite(max) || max <= min) return null;
+  return clamp((t.score - min) / (max - min));
+}
+function bestTest() {
+  let best = null;
+  for (const t of state.academics.tests) {
+    const n = testNorm(t);
+    if (n === null) continue;
+    if (!best || n > best.norm) best = { ...t, norm: n };
+  }
+  return best;
+}
+function eventById(id) { return state.fitness.events.find(e => e.id === id); }
+function entriesFor(id) {
+  return state.fitness.log.filter(l => l.eventId === id && Number.isFinite(l.value))
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+}
+function eventProgress(ev) {
+  const e = entriesFor(ev.id);
+  if (!e.length || !Number.isFinite(ev.goal) || ev.goal <= 0) return null;
+  const v = e[e.length - 1].value;
+  if (!Number.isFinite(v) || v <= 0) return null;
+  return clamp(ev.lower ? ev.goal / v : v / ev.goal);
+}
+function ptAverage() {
+  const p = state.fitness.events.map(eventProgress).filter(x => x !== null);
+  return p.length ? p.reduce((a, b) => a + b, 0) / p.length : null;
+}
+const serviceHours = () => state.activities.service.reduce((s, x) => s + (num(x.hours) || 0), 0);
+const varsitySeasons = () => state.activities.sports.filter(s => s.level === "Varsity").length;
+function awardPoints() { return state.awards.reduce((s, a) => s + (AWARD_WEIGHT[a.level] || 1), 0); }
+function goalProgress(g) {
+  if (g.done) return 1;
+  const cur = num(g.current), tgt = num(g.target);
+  if (Number.isFinite(cur) && Number.isFinite(tgt) && tgt > 0) return clamp(cur / tgt);
+  const ms = g.milestones || [];
+  if (ms.length) return ms.filter(m => m.done).length / ms.length;
+  return 0;
+}
+
+function scoreBreakdown() {
+  const parts = {};
+
+  const gpaW = cumulativeGpa("gpaW") ?? cumulativeGpa("gpaU");
+  const acadGpa  = clamp((gpaW ?? 0) / 4.3) * 16;
+  const acadRig  = clamp(rigorCount() / 8) * 7;
+  const bt = bestTest();
+  const acadTest = (bt ? bt.norm : 0) * 7;
+  parts.academics = acadGpa + acadRig + acadTest;
+
+  parts.fitness = (ptAverage() ?? 0) * 20;
+
+  parts.leadership = clamp(serviceHours() / 100) * 10 + clamp(state.activities.roles.length / 4) * 10;
+
+  parts.awards = clamp(awardPoints() / 24) * 10 + clamp(varsitySeasons() / 4) * 5;
+
+  const gs = state.goals.map(goalProgress);
+  parts.goals = (gs.length ? gs.reduce((a, b) => a + b, 0) / gs.length : 0) * 15;
+
+  const total = Math.round(Object.values(parts).reduce((a, b) => a + b, 0));
+  return { parts, total };
+}
+function tierFor(score) {
+  if (score >= 85) return { txt: "Highly competitive", color: "var(--good)" };
+  if (score >= 70) return { txt: "Competitive",       color: "var(--good)" };
+  if (score >= 55) return { txt: "On track",          color: "var(--s1)" };
+  if (score >= 40) return { txt: "Building",          color: "var(--warning)" };
+  return { txt: "Getting started", color: "var(--ink-3)" };
+}
+
+/* ---------- 4. Chart primitives ----------
+   Charts are drawn at real pixel width (measured from the container) so label
+   type never scales, and re-drawn on resize. Marks follow the house specs:
+   2px lines, >=8px markers with a 2px surface ring, <=24px bars with a 4px
+   rounded data-end square at the baseline, hairline solid grid. */
+function niceTicks(min, max, want = 4) {
+  if (!(max > min)) { max = min + 1; }
+  const span = max - min;
+  const raw = span / want;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10;
+  const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
+  return { lo, hi, ticks };
+}
+function topRoundRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, Math.max(h, 0));
+  if (h <= 0) return "";
+  return `M${x},${y + h}V${y + r}q0,-${r} ${r},-${r}h${w - 2 * r}q${r},0 ${r},${r}V${y + h}Z`;
+}
+function rightRoundRect(x, y, w, h, r) {
+  r = Math.min(r, w, h / 2);
+  if (w <= 0) return "";
+  return `M${x},${y}h${w - r}q${r},0 ${r},${r}v${h - 2 * r}q0,${r} -${r},${r}H${x}Z`;
+}
+function svgOpen(w, h, title, desc) {
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(title)}">` +
+         `<title>${esc(title)}</title>${desc ? `<desc>${esc(desc)}</desc>` : ""}`;
+}
+
+/* Multi-series categorical line chart with a crosshair tooltip. */
+function lineChart(host, cfg) {
+  const W = Math.max(260, host.clientWidth || 320);
+  const H = cfg.height || 208;
+  const P = { l: 36, r: 46, t: 14, b: 26 };
+  const cats = cfg.categories, n = cats.length;
+  const all = cfg.series.flatMap(s => s.values).filter(Number.isFinite);
+  if (!n || !all.length) { host.innerHTML = emptyBlock(cfg.emptyTitle, cfg.emptyBody); return; }
+
+  const pad = (Math.max(...all) - Math.min(...all)) * .25 || .3;
+  const { lo, hi, ticks } = niceTicks(Math.min(...all) - pad, Math.max(...all) + pad, 4);
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const X = i => n === 1 ? P.l + iw / 2 : P.l + (iw * i) / (n - 1);
+  const Y = v => P.t + ih - ((v - lo) / (hi - lo)) * ih;
+
+  let g = svgOpen(W, H, cfg.title, cfg.desc);
+  for (const t of ticks) {
+    g += `<line class="gridline" x1="${P.l}" y1="${Y(t).toFixed(1)}" x2="${W - P.r}" y2="${Y(t).toFixed(1)}"/>`;
+    g += `<text class="tick end" x="${P.l - 7}" y="${(Y(t) + 3.5).toFixed(1)}">${esc(cfg.yFmt ? cfg.yFmt(t) : t)}</text>`;
+  }
+  g += `<line class="axisline" x1="${P.l}" y1="${P.t + ih}" x2="${W - P.r}" y2="${P.t + ih}"/>`;
+
+  const every = Math.ceil(n / Math.max(2, Math.floor(iw / 68)));
+  cats.forEach((c, i) => {
+    if (i % every && i !== n - 1) return;
+    g += `<text class="tick mid" x="${X(i).toFixed(1)}" y="${H - 8}">${esc(c)}</text>`;
+  });
+
+  // lines, area wash for a single series, end markers
+  cfg.series.forEach(s => {
+    const pts = s.values.map((v, i) => Number.isFinite(v) ? [X(i), Y(v)] : null).filter(Boolean);
+    if (!pts.length) return;
+    if (cfg.series.length === 1 && pts.length > 1) {
+      g += `<path class="area-wash" fill="${s.color}" d="M${pts.map(p => p.map(q => q.toFixed(1)).join(",")).join("L")}L${pts[pts.length - 1][0].toFixed(1)},${P.t + ih}L${pts[0][0].toFixed(1)},${P.t + ih}Z"/>`;
+    }
+    g += `<path class="series-line" stroke="${s.color}" d="M${pts.map(p => p.map(q => q.toFixed(1)).join(",")).join("L")}"/>`;
+    pts.forEach(p => { g += `<circle class="series-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" fill="${s.color}"/>`; });
+  });
+
+  // selective direct labels: endpoint only, nudged apart when two ends converge
+  const ends = cfg.series.map(s => {
+    let li = -1; s.values.forEach((v, i) => { if (Number.isFinite(v)) li = i; });
+    return li < 0 ? null : { s, i: li, y: Y(s.values[li]), v: s.values[li] };
+  }).filter(Boolean);
+  ends.sort((a, b) => a.y - b.y);
+  ends.forEach((e, k) => {
+    let dy = 4;
+    if (ends.length > 1) {
+      const near = ends.find((o, j) => j !== k && Math.abs(o.y - e.y) < 14);
+      if (near) dy = (k === 0 ? -6 : 14);
+    }
+    g += `<text class="dlabel" x="${(X(e.i) + 9).toFixed(1)}" y="${(e.y + dy).toFixed(1)}">${esc(cfg.yFmt ? cfg.yFmt(e.v) : e.v)}</text>`;
+  });
+
+  // hover layer: full-height bands, so the hit target is never pinpoint
+  g += `<line class="hover-rule" x1="0" y1="${P.t}" x2="0" y2="${P.t + ih}" style="opacity:0"/>`;
+  cats.forEach((c, i) => {
+    const bw = n === 1 ? iw : iw / (n - 1);
+    g += `<rect class="hit" data-i="${i}" x="${(X(i) - bw / 2).toFixed(1)}" y="${P.t}" width="${bw.toFixed(1)}" height="${ih}"/>`;
+  });
+  g += `</svg>`;
+
+  host.innerHTML = `<div class="chart">${g}<div class="tip"></div></div>` +
+    (cfg.series.length > 1 ? `<div class="legend">${cfg.series.map(s =>
+      `<span><i class="key" style="background:${s.color}"></i>${esc(s.name)}</span>`).join("")}</div>` : "");
+
+  wireHover(host, cats, cfg, X, Y, P);
+}
+
+function wireHover(host, cats, cfg, X, Y, P) {
+  const chart = $(".chart", host), tip = $(".tip", host), svg = $("svg", host);
+  const rule = $(".hover-rule", svg);
+  const show = i => {
+    const rows = cfg.series.map(s => Number.isFinite(s.values[i])
+      ? `<div class="row"><i style="background:${s.color}"></i><span class="n">${esc(s.name)}</span><span class="v">${esc(cfg.yFmt ? cfg.yFmt(s.values[i]) : s.values[i])}</span></div>` : "").join("");
+    if (!rows) return;
+    tip.innerHTML = `<b>${esc(cats[i])}</b>${rows}`;
+    const ys = cfg.series.map(s => s.values[i]).filter(Number.isFinite).map(Y);
+    tip.style.left = X(i) + "px";
+    tip.style.top = (ys.length ? Math.min(...ys) : P.t) + "px";
+    tip.classList.add("on");
+    rule.setAttribute("x1", X(i)); rule.setAttribute("x2", X(i)); rule.style.opacity = ".9";
+  };
+  $$(".hit", svg).forEach(r => {
+    const i = +r.dataset.i;
+    r.addEventListener("mouseenter", () => show(i));
+    r.addEventListener("focus", () => show(i));
+    r.setAttribute("tabindex", "0");
+  });
+  chart.addEventListener("mouseleave", () => { tip.classList.remove("on"); rule.style.opacity = "0"; });
+}
+
+/* Single-series column chart (monthly service hours). */
+function columnChart(host, cfg) {
+  const W = Math.max(260, host.clientWidth || 320);
+  const H = cfg.height || 190;
+  const P = { l: 34, r: 12, t: 18, b: 26 };
+  const d = cfg.data;
+  if (!d.length) { host.innerHTML = emptyBlock(cfg.emptyTitle, cfg.emptyBody); return; }
+
+  const { lo, hi, ticks } = niceTicks(0, Math.max(...d.map(x => x.v)) || 1, 3);
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const band = iw / d.length;
+  const bw = Math.min(24, band - 6);
+  const Y = v => P.t + ih - ((v - lo) / (hi - lo)) * ih;
+
+  let g = svgOpen(W, H, cfg.title, cfg.desc);
+  for (const t of ticks) {
+    g += `<line class="gridline" x1="${P.l}" y1="${Y(t).toFixed(1)}" x2="${W - P.r}" y2="${Y(t).toFixed(1)}"/>`;
+    g += `<text class="tick end" x="${P.l - 7}" y="${(Y(t) + 3.5).toFixed(1)}">${esc(fmtNum(t))}</text>`;
+  }
+  g += `<line class="axisline" x1="${P.l}" y1="${P.t + ih}" x2="${W - P.r}" y2="${P.t + ih}"/>`;
+
+  const maxV = Math.max(...d.map(x => x.v));
+  const every = Math.ceil(d.length / Math.max(2, Math.floor(iw / 46)));
+  d.forEach((row, i) => {
+    const x = P.l + band * i + (band - bw) / 2, y = Y(row.v), h = P.t + ih - y;
+    g += `<path class="bar" fill="${cfg.color}" d="${topRoundRect(x, y, bw, h, 4)}"/>`;
+    if (row.v === maxV && maxV > 0) g += `<text class="dlabel mid" x="${(x + bw / 2).toFixed(1)}" y="${(y - 6).toFixed(1)}">${esc(fmtNum(row.v))}</text>`;
+    if (!(i % every) || i === d.length - 1) g += `<text class="tick mid" x="${(x + bw / 2).toFixed(1)}" y="${H - 8}">${esc(row.label)}</text>`;
+    g += `<rect class="hit" data-i="${i}" x="${(P.l + band * i).toFixed(1)}" y="${P.t}" width="${band.toFixed(1)}" height="${ih}"/>`;
+  });
+  g += `</svg>`;
+  host.innerHTML = `<div class="chart">${g}<div class="tip"></div></div>`;
+
+  const tip = $(".tip", host), chart = $(".chart", host);
+  $$(".hit", host).forEach(r => {
+    const row = d[+r.dataset.i];
+    const on = () => {
+      tip.innerHTML = `<b>${esc(row.full || row.label)}</b><div class="row"><i style="background:${cfg.color}"></i><span class="n">${esc(cfg.unit || "hours")}</span><span class="v">${esc(fmtNum(row.v, row.v % 1 ? 1 : 0))}</span></div>`;
+      tip.style.left = (P.l + band * (+r.dataset.i) + band / 2) + "px";
+      tip.style.top = Y(row.v) + "px";
+      tip.classList.add("on");
+    };
+    r.setAttribute("tabindex", "0");
+    r.addEventListener("mouseenter", on); r.addEventListener("focus", on);
+  });
+  chart.addEventListener("mouseleave", () => tip.classList.remove("on"));
+}
+
+/* Horizontal bars on an ordinal ramp (award reach: school -> national). */
+function ordinalBars(host, rows) {
+  const W = Math.max(220, host.clientWidth || 300);
+  const total = Math.max(...rows.map(r => r.v), 1);
+  const P = { l: 74, r: 34, t: 6, b: 6 };
+  const rowH = 30, H = P.t + P.b + rowH * rows.length;
+  const iw = W - P.l - P.r;
+  let g = svgOpen(W, H, "Awards by recognition level", rows.map(r => `${r.label}: ${r.v}`).join("; "));
+  rows.forEach((r, i) => {
+    const y = P.t + rowH * i + 8, bh = 14;
+    const w = (r.v / total) * iw;
+    g += `<text class="tick end" x="${P.l - 10}" y="${y + 11}" style="font-size:11px;fill:var(--ink-2)">${esc(r.label)}</text>`;
+    g += `<line class="gridline" x1="${P.l}" y1="${y + bh / 2}" x2="${W - P.r}" y2="${y + bh / 2}" style="opacity:.5"/>`;
+    if (r.v > 0) g += `<path fill="${r.color}" d="${rightRoundRect(P.l, y, w, bh, 4)}"/>`;
+    g += `<text class="dlabel" x="${(P.l + w + 8).toFixed(1)}" y="${y + 11}">${r.v}</text>`;
+  });
+  g += `</svg>`;
+  host.innerHTML = `<div class="chart">${g}</div>`;
+}
+
+/* 12-point sparkline: de-emphasis line, accent dot on the current period. */
+function sparkline(vals, opts = {}) {
+  const w = opts.w || 78, h = opts.h || 22, r = 3;
+  const v = vals.filter(Number.isFinite).slice(-12);
+  if (v.length < 2) return "";
+  const lo = Math.min(...v), hi = Math.max(...v), span = (hi - lo) || 1;
+  const X = i => r + (i * (w - 2 * r)) / (v.length - 1);
+  const Y = x => (h - r) - ((x - lo) / span) * (h - 2 * r);
+  const d = v.map((x, i) => `${X(i).toFixed(1)},${Y(x).toFixed(1)}`).join("L");
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">` +
+    `<path fill="none" stroke="var(--mute-mark)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M${d}"/>` +
+    `<circle cx="${X(v.length - 1).toFixed(1)}" cy="${Y(v[v.length - 1]).toFixed(1)}" r="${r}" fill="${opts.color || "var(--s1)"}" stroke="var(--surface)" stroke-width="2"/></svg>`;
+}
+
+
+/* ---------- 4b. Ornaments (chrome only — never over a plot) ----------
+   Both are generated rather than hand-authored so the geometry stays even. */
+function drawHeaderOrnament() {
+  const el = $(".hdr-ornament");
+  if (!el) return;
+  let d = "";
+  for (let i = 0; i < 22; i++) {
+    const x = i * 28 + 6, y = 10 + (i % 3) * 15;
+    d += `<path d="M${x} ${y + 11}l7-7 7 7"/>`;          // rank chevron
+    if (i % 4 === 2) d += `<path d="M${x + 7} ${y + 20}v5"/>`;  // occasional tick
+  }
+  el.innerHTML = d;
+}
+
+function drawWreath() {
+  const el = $("#wreathSvg");
+  if (!el) return;
+  const cx = 100, cy = 100, R = 90;
+  const pt = (r, deg) => [cx + r * Math.sin(deg * Math.PI / 180), cy - r * Math.cos(deg * Math.PI / 180)];
+  let out = "";
+  for (const side of [1, -1]) {
+    const [x1, y1] = pt(R, side * 42), [x2, y2] = pt(R, side * 152);
+    out += `<path class="stem" d="M${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 0 ${side > 0 ? 1 : 0} ${x2.toFixed(1)},${y2.toFixed(1)}"/>`;
+    for (let k = 0; k < 6; k++) {
+      const deg = side * (52 + k * 18);
+      const [lx, ly] = pt(R + 7, deg);
+      const rot = deg + side * 74;              // near-tangent, splayed slightly outward
+      out += `<ellipse class="leaf" cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" rx="9.5" ry="3.4"`
+           + ` transform="rotate(${rot.toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})"`
+           + ` style="opacity:${(0.45 + k * 0.08).toFixed(2)}"/>`;
+    }
+  }
+  const [px, py] = pt(R, 180);
+  out += `<circle class="pip" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3.6"/>`;
+  el.innerHTML = out;
+}
+
+/* ---------- 5. Reusable blocks ---------- */
+function emptyBlock(title, body) {
+  return `<div class="empty"><strong>${esc(title || "Nothing here yet")}</strong>${esc(body || "")}</div>`;
+}
+function meterRow(name, valText, ratio, opts = {}) {
+  const pct = clamp(ratio) * 100;
+  const cls = opts.status ? " is-" + opts.status : "";
+  return `<div class="meter-row">
+    <div class="top-line"><span class="name">${esc(name)}</span><span class="val">${esc(valText)}</span></div>
+    <div class="meter${cls}"><i style="width:${pct.toFixed(1)}%"></i></div>
+    ${opts.note ? `<div class="meter-note">${esc(opts.note)}</div>` : ""}
+  </div>`;
+}
+function kpi(o) {
+  const d = o.delta;
+  const dcls = d == null ? "flat" : d > 0 ? "up" : d < 0 ? "down" : "flat";
+  const dtxt = d == null ? (o.deltaText || "") : (d > 0 ? "▲ " : d < 0 ? "▼ " : "") + o.deltaText;
+  return `<div class="kpi">
+    <span class="label">${esc(o.label)}</span>
+    <span class="value">${o.value}${o.unit ? `<span class="unit"> ${esc(o.unit)}</span>` : ""}</span>
+    <div class="trend">${o.spark || ""}</div>
+    <div class="foot"><span class="delta ${dcls}">${esc(dtxt)}</span></div>
+  </div>`;
+}
+function gradeChip(g) {
+  const s = String(g || "").trim().toUpperCase();
+  if (!s) return `<span class="chip">—</span>`;
+  const first = s[0];
+  const map = { A: "var(--good)", B: "var(--s1)", C: "var(--warning)", D: "var(--serious)", F: "var(--critical)" };
+  const c = map[first] || "var(--ink-3)";
+  return `<span class="chip"><i class="dot" style="background:${c}"></i><span class="grade">${esc(s)}</span></span>`;
+}
+function actionBtns(kind, id) {
+  return `<button class="btn tiny ghost" data-edit="${kind}" data-id="${id}" aria-label="Edit">Edit</button>`;
+}
+function tableFrom(head, rows) {
+  return `<div class="table-scroll"><table><thead><tr>${head.map(h =>
+    `<th${h.num ? ' class="num"' : ""}>${esc(h.t)}</th>`).join("")}</tr></thead><tbody>${rows.map(r =>
+    `<tr>${r.map((c, i) => `<td${head[i] && head[i].num ? ' class="num"' : ""}>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+/* ---------- 6. Panel renderers ---------- */
+function renderHeader() {
+  const p = state.profile;
+  $("#hdrName").textContent = p.name ? `${p.name}` : "Progress Command Center";
+  const bits = [];
+  if (p.school) bits.push(p.school);
+  if (p.gradYear) bits.push("Class of " + p.gradYear);
+  if (p.branch) bits.push(p.branch + (p.rank ? " · " + p.rank : ""));
+  else if (p.rank) bits.push(p.rank);
+  $("#hdrMeta").textContent = bits.length ? bits.join(" · ") : "Academics · Fitness · Leadership · Goals";
+  const n = streak();
+  $("#streakN").textContent = n;
+  $("#streakChip").style.opacity = n ? "1" : ".6";
+}
+
+function renderOverview() {
+  const { parts, total } = scoreBreakdown();
+
+  // hero ring + count-up
+  const C = 2 * Math.PI * 72;
+  $("#ringFill").setAttribute("stroke-dasharray", C.toFixed(1));
+  requestAnimationFrame(() => $("#ringFill").setAttribute("stroke-dashoffset", (C * (1 - total / 100)).toFixed(1)));
+  countUp($("#heroScore"), total, v => `${v}<small>/100</small>`);
+  const tier = tierFor(total);
+  $("#tierChip").innerHTML = `<span class="dot" style="background:${tier.color}"></span><span class="txt">${esc(tier.txt)}</span>`;
+
+  const worst = PILLARS.map(p => ({ p, share: parts[p.k] / p.weight })).sort((a, b) => a.share - b.share)[0];
+  $("#tierNote").textContent = total === 0
+    ? "Add your GPA, a PT result and one goal — the score fills in as you log."
+    : `Biggest opportunity right now: ${worst.p.name.toLowerCase()} (${Math.round(worst.share * 100)}% of those points earned).`;
+
+  // pillar meters
+  $("#pillarMeters").innerHTML = PILLARS.map(p => {
+    const got = parts[p.k], ratio = got / p.weight;
+    return meterRow(p.name, `${got.toFixed(1)} / ${p.weight}`, ratio, {
+      note: p.hint,
+      status: ratio >= .8 ? "good" : ratio >= .4 ? "" : ratio > 0 ? "warning" : "critical"
+    });
+  }).join("");
+
+  // KPI row
+  const terms = sortedTerms();
+  const gpaSeries = terms.map(t => t.gpaW ?? t.gpaU).filter(Number.isFinite);
+  const gpaDelta = gpaSeries.length > 1 ? gpaSeries[gpaSeries.length - 1] - gpaSeries[gpaSeries.length - 2] : null;
+  const bt = bestTest();
+  const svcMonths = serviceByMonth();
+  const pt = ptAverage();
+  const openGoals = state.goals.filter(g => !g.done);
+  const onTrack = openGoals.filter(g => goalProgress(g) >= .5).length;
+  const stateAbove = state.awards.filter(a => a.level === "State" || a.level === "National").length;
+
+  $("#kpiRow").innerHTML = [
+    kpi({
+      label: "Latest term GPA",
+      value: gpaSeries.length ? gpaSeries[gpaSeries.length - 1].toFixed(2) : "—",
+      delta: gpaDelta,
+      deltaText: gpaDelta == null
+        ? (gpaSeries.length ? "first term logged" : "add a term")
+        : `${Math.abs(gpaDelta).toFixed(2)} vs previous term`,
+      spark: sparkline(gpaSeries)
+    }),
+    kpi({
+      label: "Best test score", value: bt ? fmtNum(bt.score, bt.score % 1 ? 1 : 0) : "—",
+      deltaText: bt ? bt.name : "no scores yet", delta: null
+    }),
+    kpi({
+      label: "Service hours", value: compact(serviceHours()), unit: "hrs",
+      deltaText: svcMonths.length ? `${fmtNum(svcMonths[svcMonths.length - 1].v, 0)} this month` : "log your first",
+      delta: null, spark: sparkline(svcMonths.map(m => m.v), { color: "var(--s3)" })
+    }),
+    kpi({
+      label: "PT goal average", value: pt == null ? "—" : Math.round(pt * 100), unit: pt == null ? "" : "%",
+      deltaText: pt == null ? "log a PT test" : `${state.fitness.events.filter(e => eventProgress(e) !== null).length} / ${state.fitness.events.length} events`,
+      delta: null, spark: sparkline(ptCompositeSeries(), { color: "var(--s2)" })
+    }),
+    kpi({ label: "Awards", value: fmtNum(state.awards.length), deltaText: `${stateAbove} at state or above`, delta: null }),
+    kpi({ label: "Goals on track", value: `${onTrack}<span class="unit"> / ${openGoals.length}</span>`, deltaText: `${state.goals.filter(g => g.done).length} completed`, delta: null })
+  ].join("");
+
+  // GPA trend + table twin
+  drawGpaChart($("#gpaChart"));
+  $("#gpaTable").innerHTML = terms.length ? tableFrom(
+    [{ t: "Term" }, { t: "Weighted", num: true }, { t: "Unweighted", num: true }],
+    terms.map(t => [esc(termLabel(t)), Number.isFinite(t.gpaW) ? t.gpaW.toFixed(2) : "—", Number.isFinite(t.gpaU) ? t.gpaU.toFixed(2) : "—"])
+  ) : emptyBlock("No terms yet", "Add one on the Academics tab.");
+
+  // deadlines
+  const items = [
+    ...state.goals.filter(g => g.due && !g.done).map(g => ({ d: g.due, t: g.title, m: "Goal · " + (g.category || "—"), i: "target" })),
+    ...state.college.filter(c => c.deadline && !["Enrolled", "Declined"].includes(c.status)).map(c => ({ d: c.deadline, t: c.school, m: "Application · " + (c.status || "—"), i: "cap" }))
+  ].sort((a, b) => a.d.localeCompare(b.d)).slice(0, 6);
+
+  $("#upNext").innerHTML = items.length ? `<div class="items">${items.map(x => {
+    const n = daysUntil(x.d);
+    const st = n == null ? "" : n < 0 ? "var(--critical)" : n <= 14 ? "var(--warning)" : n <= 45 ? "var(--s1)" : "var(--good)";
+    const lbl = n == null ? "—" : n < 0 ? `${-n}d overdue` : n === 0 ? "today" : `in ${n}d`;
+    return `<div class="item"><div class="lead">${icon(x.i)}</div><div class="body">
+      <div class="t">${esc(x.t)}</div><div class="m"><em>${esc(x.m)}</em><span>${esc(fmtDate(x.d))}</span></div></div>
+      <div class="side"><span class="chip"><i class="dot" style="background:${st}"></i>${esc(lbl)}</span></div></div>`;
+  }).join("")}</div>` : emptyBlock("No dated items", "Give a goal or a college target a deadline and it shows up here.");
+
+  // active goals
+  $("#overviewGoals").innerHTML = openGoals.length
+    ? openGoals.slice(0, 6).map(g => goalMeter(g)).join("")
+    : emptyBlock("No open goals", "Add one on the Goals & College tab.");
+}
+
+function drawGpaChart(host) {
+  const terms = sortedTerms();
+  lineChart(host, {
+    title: "GPA by term",
+    desc: "Weighted and unweighted grade point average for each logged term.",
+    categories: terms.map(termLabel),
+    yFmt: v => v.toFixed(1),
+    series: [
+      { name: "Weighted", color: "var(--s1)", values: terms.map(t => Number.isFinite(t.gpaW) ? t.gpaW : null) },
+      { name: "Unweighted", color: "var(--s2)", values: terms.map(t => Number.isFinite(t.gpaU) ? t.gpaU : null) }
+    ].filter(s => s.values.some(Number.isFinite)),
+    emptyTitle: "No GPA logged yet",
+    emptyBody: "Add a term on the Academics tab to start the trend."
+  });
+}
+function ptCompositeSeries() {
+  const byDate = {};
+  for (const l of state.fitness.log) {
+    const ev = eventById(l.eventId);
+    if (!ev || !Number.isFinite(ev.goal) || !Number.isFinite(l.value) || l.value <= 0) continue;
+    const r = clamp(ev.lower ? ev.goal / l.value : l.value / ev.goal);
+    (byDate[l.date] = byDate[l.date] || []).push(r);
+  }
+  return Object.keys(byDate).sort().map(d => {
+    const a = byDate[d];
+    return Math.round((a.reduce((x, y) => x + y, 0) / a.length) * 100);
+  });
+}
+function serviceByMonth() {
+  const m = {};
+  for (const s of state.activities.service) {
+    if (!s.date) continue;
+    m[monthKey(s.date)] = (m[monthKey(s.date)] || 0) + (num(s.hours) || 0);
+  }
+  const keys = Object.keys(m).sort();
+  if (!keys.length) return [];
+  // fill gaps so the time axis is honest
+  const out = [];
+  let cur = keys[0];
+  const last = keys[keys.length - 1];
+  let guard = 0;
+  while (cur <= last && guard++ < 120) {
+    out.push({ key: cur, label: fmtMonth(cur), full: fmtMonth(cur), v: Math.round((m[cur] || 0) * 10) / 10 });
+    const [y, mo] = cur.split("-").map(Number);
+    const d = new Date(y, mo, 1);
+    cur = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  }
+  return out.slice(-24);
+}
+
+function renderAcademics() {
+  const terms = sortedTerms();
+  const bt = bestTest();
+  const p = state.profile;
+  const rankTxt = (p.classRank && p.classSize) ? `${p.classRank} / ${p.classSize}` : "—";
+  const pctile = (p.classRank && p.classSize) ? `top ${Math.max(1, Math.round((p.classRank / p.classSize) * 100))}%` : "set in Profile";
+
+  $("#acadKpis").innerHTML = [
+    kpi({ label: "Cumulative weighted", value: cumulativeGpa("gpaW") != null ? cumulativeGpa("gpaW").toFixed(2) : "—", deltaText: `${terms.length} terms logged`, delta: null }),
+    kpi({ label: "Cumulative unweighted", value: cumulativeGpa("gpaU") != null ? cumulativeGpa("gpaU").toFixed(2) : "—", deltaText: "4.00 scale", delta: null }),
+    kpi({ label: "Rigor courses", value: fmtNum(rigorCount()), deltaText: "AP · IB · dual · honours", delta: null }),
+    kpi({ label: "Class rank", value: rankTxt, deltaText: pctile, delta: null }),
+    kpi({ label: "Best score", value: bt ? fmtNum(bt.score) : "—", deltaText: bt ? `${bt.name} · ${fmtDate(bt.date)}` : "no scores yet", delta: null })
+  ].join("");
+
+  drawGpaChart($("#termChart"));
+
+  $("#termList").innerHTML = terms.length ? tableFrom(
+    [{ t: "Term" }, { t: "Weighted", num: true }, { t: "Unweighted", num: true }, { t: "" }],
+    terms.map(t => [esc(termLabel(t)),
+      Number.isFinite(t.gpaW) ? t.gpaW.toFixed(2) : "—",
+      Number.isFinite(t.gpaU) ? t.gpaU.toFixed(2) : "—",
+      `<div class="actions">${actionBtns("terms", t.id)}</div>`])
+  ) : emptyBlock("No terms yet", "Add your first grading term to start the GPA trend.");
+
+  const tests = [...state.academics.tests].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  $("#testList").innerHTML = tests.length ? `<div class="items">${tests.map(t => {
+    const isBest = bt && bt.id === t.id;
+    const r = TEST_RANGE[t.name];
+    const max = Number.isFinite(t.max) ? t.max : (r ? r[1] : null);
+    return `<div class="item"><div class="lead">${icon(isBest ? "medal" : "certificate")}</div><div class="body">
+      <div class="t">${esc(t.name)} — ${fmtNum(t.score, t.score % 1 ? 1 : 0)}${max ? `<span class="sub"> / ${fmtNum(max)}</span>` : ""}</div>
+      <div class="m"><span>${esc(fmtDate(t.date))}</span>${isBest ? `<span class="chip"><i class="dot" style="background:var(--good)"></i>best</span>` : ""}${t.notes ? `<em>${esc(t.notes)}</em>` : ""}</div>
+    </div><div class="side">${actionBtns("tests", t.id)}</div></div>`;
+  }).join("")}</div>` : emptyBlock("No test scores yet", "Log an SAT, ACT, PSAT or ASVAB result.");
+
+  const courses = [...state.academics.courses].sort((a, b) =>
+    (a.term || "").localeCompare(b.term || "") || (a.name || "").localeCompare(b.name || ""));
+  $("#courseTable").innerHTML = courses.length ? tableFrom(
+    [{ t: "Course" }, { t: "Level" }, { t: "Term" }, { t: "Grade" }, { t: "Credits", num: true }, { t: "" }],
+    courses.map(c => [
+      esc(c.name),
+      `<span class="chip">${esc(c.level || "—")}</span>`,
+      esc(c.term || "—"),
+      gradeChip(c.grade),
+      Number.isFinite(c.credits) ? fmtNum(c.credits, c.credits % 1 ? 1 : 0) : "—",
+      `<div class="actions">${actionBtns("courses", c.id)}</div>`])
+  ) : emptyBlock("No courses yet", "Add the classes you are taking — rigor counts toward readiness.");
+}
+
+function renderFitness() {
+  const pt = ptAverage();
+  const evs = state.fitness.events;
+  const logged = evs.filter(e => entriesFor(e.id).length).length;
+  const last = [...state.fitness.log].sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
+  const atGoal = evs.filter(e => (eventProgress(e) ?? 0) >= 1).length;
+
+  $("#fitKpis").innerHTML = [
+    kpi({ label: "PT goal average", value: pt == null ? "—" : Math.round(pt * 100), unit: pt == null ? "" : "%", deltaText: `${logged} / ${evs.length} events logged`, delta: null, spark: sparkline(ptCompositeSeries(), { color: "var(--s2)" }) }),
+    kpi({ label: "Events at goal", value: `${atGoal}<span class="unit"> / ${evs.length}</span>`, deltaText: atGoal === evs.length && evs.length ? "all standards met" : "keep pushing", delta: null }),
+    kpi({ label: "Tests logged", value: fmtNum(state.fitness.log.length), deltaText: last ? "last " + fmtDate(last.date) : "none yet", delta: null }),
+    kpi({ label: "Fitness pillar", value: `${((pt ?? 0) * 20).toFixed(1)}<span class="unit"> / 20</span>`, deltaText: "of the readiness", delta: null })
+  ].join("");
+
+  $("#fitMultiples").innerHTML = evs.length ? evs.map(ev => {
+    const e = entriesFor(ev.id);
+    const cur = e.length ? e[e.length - 1].value : null;
+    const prog = eventProgress(ev);
+    const f = v => ev.unit === "time" ? fmtTime(v) : fmtNum(v, v % 1 ? 1 : 0);
+    // Lower-is-better events are inverted for the sparkline so "up" always reads as "better".
+    const sv = e.map(x => ev.lower ? -x.value : x.value);
+    const st = prog == null ? "" : prog >= 1 ? "good" : prog >= .75 ? "" : prog >= .5 ? "warning" : "critical";
+    return `<div class="mult">
+      <div class="name"><span>${esc(ev.name)}</span><span class="cur">${cur == null ? "—" : esc(f(cur))}</span></div>
+      <div class="goal-note">Goal ${esc(f(ev.goal))}${ev.lower ? " or faster" : " or more"}${ev.note ? " · " + esc(ev.note) : ""}</div>
+      ${sparkline(sv, { w: 100, h: 26, color: "var(--s1)" }) || `<div class="spark" style="height:26px"></div>`}
+      <div class="mult-foot">
+        ${meterRow("Progress to goal", prog == null ? "no data" : Math.round(prog * 100) + "%", prog ?? 0, { status: st })}
+        <div class="actions" style="margin-top:6px">${actionBtns("fitevents", ev.id)}</div>
+      </div>
+    </div>`;
+  }).join("") : emptyBlock("No PT events", "Use “Edit events” to add the events your programme tests.");
+
+  const log = [...state.fitness.log].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const shown = ui.fitAll ? log : log.slice(0, 12);
+  $("#fitLog").innerHTML = log.length ? tableFrom(
+    [{ t: "Date" }, { t: "Event" }, { t: "Result", num: true }, { t: "vs goal", num: true }, { t: "Notes" }, { t: "" }],
+    shown.map(l => {
+      const ev = eventById(l.eventId);
+      const f = v => ev && ev.unit === "time" ? fmtTime(v) : fmtNum(v, v % 1 ? 1 : 0);
+      let vs = "—";
+      if (ev && Number.isFinite(ev.goal) && Number.isFinite(l.value) && l.value > 0) {
+        vs = Math.round(clamp(ev.lower ? ev.goal / l.value : l.value / ev.goal) * 100) + "%";
+      }
+      return [esc(fmtDate(l.date)), esc(ev ? ev.name : "—"), esc(f(l.value)), vs, esc(l.notes || ""),
+        `<div class="actions">${actionBtns("fitlog", l.id)}</div>`];
+    })
+  ) + (log.length > 12 ? `<p class="sub" style="margin-top:8px">Showing ${shown.length} of ${log.length}.</p>` : "")
+    : emptyBlock("No results logged", "Record a PT test and the trends fill in.");
+}
+
+function renderActivities() {
+  const svc = serviceByMonth();
+  const roles = [...state.activities.roles].sort((a, b) => (b.start || "").localeCompare(a.start || ""));
+  const sports = [...state.activities.sports].sort((a, b) => (b.year || 0) - (a.year || 0));
+  const thisYear = state.activities.service.filter(s => (s.date || "").slice(0, 4) === String(new Date().getFullYear()))
+    .reduce((a, b) => a + (num(b.hours) || 0), 0);
+
+  $("#actKpis").innerHTML = [
+    kpi({ label: "Service hours", value: compact(serviceHours()), unit: "hrs", deltaText: `${fmtNum(thisYear, thisYear % 1 ? 1 : 0)} this year`, delta: null, spark: sparkline(svc.map(m => m.v), { color: "var(--s3)" }) }),
+    kpi({ label: "Varsity seasons", value: fmtNum(varsitySeasons()), deltaText: `${sports.length} seasons total`, delta: null }),
+    kpi({ label: "Leadership roles", value: fmtNum(roles.length), deltaText: roles.filter(r => !r.end).length + " current", delta: null }),
+    kpi({ label: "Leadership pillar", value: `${(clamp(serviceHours() / 100) * 10 + clamp(roles.length / 4) * 10).toFixed(1)}<span class="unit"> / 20</span>`, deltaText: "100 hrs + 4 roles", delta: null })
+  ].join("");
+
+  $("#sportList").innerHTML = sports.length ? `<div class="items">${sports.map(s => `
+    <div class="item"><div class="lead">${icon("trophy")}</div><div class="body">
+      <div class="t">${esc(s.sport)}${s.year ? ` <span class="sub">${esc(s.season || "")} ${s.year}</span>` : ""}</div>
+      <div class="m"><span class="chip">${esc(s.level || "—")}</span>${s.position ? `<em>${esc(s.position)}</em>` : ""}${s.stats ? `<span>${esc(s.stats)}</span>` : ""}</div>
+      ${s.highlights ? `<div class="m"><span>${esc(s.highlights)}</span></div>` : ""}
+    </div><div class="side">${actionBtns("sports", s.id)}</div></div>`).join("")}</div>`
+    : emptyBlock("No seasons logged", "Add a sport and season — varsity seasons feed the athletics pillar.");
+
+  $("#roleList").innerHTML = roles.length ? `<div class="items">${roles.map(r => `
+    <div class="item"><div class="lead">${icon("star")}</div><div class="body">
+      <div class="t">${esc(r.title)}</div>
+      <div class="m"><em>${esc(r.org || "")}</em><span>${esc(fmtDate(r.start))} – ${r.end ? esc(fmtDate(r.end)) : "present"}</span>
+      ${!r.end ? `<span class="chip"><i class="dot" style="background:var(--good)"></i>current</span>` : ""}</div>
+      ${r.notes ? `<div class="m"><span>${esc(r.notes)}</span></div>` : ""}
+    </div><div class="side">${actionBtns("roles", r.id)}</div></div>`).join("")}</div>`
+    : emptyBlock("No roles yet", "Cadet billets, team captain, club officer, a job — all count.");
+
+  columnChart($("#svcChart"), {
+    title: "Service hours by month", desc: "Volunteer and community service hours, totalled per calendar month.",
+    data: svc, color: "var(--s3)", unit: "hours",
+    emptyTitle: "No service hours yet", emptyBody: "Log an entry and the monthly chart appears."
+  });
+  $("#svcTable").innerHTML = svc.length ? tableFrom([{ t: "Month" }, { t: "Hours", num: true }],
+    svc.map(m => [esc(fmtMonth(m.key)), fmtNum(m.v, m.v % 1 ? 1 : 0)])) : emptyBlock("No service hours yet", "");
+
+  const recent = [...state.activities.service].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 10);
+  $("#svcList").innerHTML = recent.length ? tableFrom(
+    [{ t: "Date" }, { t: "Organisation" }, { t: "What you did" }, { t: "Hours", num: true }, { t: "" }],
+    recent.map(s => [esc(fmtDate(s.date)), esc(s.org || "—"), esc(s.description || ""),
+      fmtNum(num(s.hours), (num(s.hours) || 0) % 1 ? 1 : 0), `<div class="actions">${actionBtns("service", s.id)}</div>`])
+  ) : "";
+}
+
+function renderAwards() {
+  const list = [...state.awards].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const jrotc = list.filter(a => a.category === "JROTC").length;
+  $("#awardKpis").innerHTML = [
+    kpi({ label: "Total awards", value: fmtNum(list.length), deltaText: `${awardPoints()} reach pts`, delta: null }),
+    kpi({ label: "State or national", value: fmtNum(list.filter(a => a.level === "State" || a.level === "National").length), deltaText: "highest reach", delta: null }),
+    kpi({ label: "JROTC awards", value: fmtNum(jrotc), deltaText: "ribbons and medals", delta: null }),
+    kpi({ label: "Awards pillar", value: `${(clamp(awardPoints() / 24) * 10 + clamp(varsitySeasons() / 4) * 5).toFixed(1)}<span class="unit"> / 15</span>`, deltaText: "reach + varsity seasons", delta: null })
+  ].join("");
+
+  const ordColors = ["var(--ord-1)", "var(--ord-2)", "var(--ord-3)", "var(--ord-4)"];
+  ordinalBars($("#awardLevels"), AWARD_LEVELS.map((l, i) => ({
+    label: l, v: list.filter(a => a.level === l).length, color: ordColors[i]
+  })));
+
+  $("#awardList").innerHTML = list.length ? `<div class="timeline">${list.map(a => `
+    <div class="item"><div class="lead">${icon(ICONS[a.category] || "sparkle")}</div><div class="body">
+      <div class="t">${esc(a.title)}</div>
+      <div class="m"><span>${esc(fmtDate(a.date))}</span><span class="chip">${esc(a.level || "School")}</span><em>${esc(a.category || "Other")}</em></div>
+      ${a.notes ? `<div class="m"><span>${esc(a.notes)}</span></div>` : ""}
+    </div><div class="side">${actionBtns("awards", a.id)}</div></div>`).join("")}</div>`
+    : emptyBlock("No awards yet", "Ribbons, honour roll, medals, promotions, certifications — log them as they land.");
+}
+
+function goalMeter(g) {
+  const p = goalProgress(g);
+  const cur = num(g.current), tgt = num(g.target);
+  const valText = (Number.isFinite(cur) && Number.isFinite(tgt))
+    ? `${fmtNum(cur, cur % 1 ? 1 : 0)} / ${fmtNum(tgt, tgt % 1 ? 1 : 0)}${g.unit ? " " + g.unit : ""}`
+    : `${Math.round(p * 100)}%`;
+  const n = daysUntil(g.due);
+  const note = [g.category, g.due ? (n < 0 ? `${-n} days overdue` : n === 0 ? "due today" : `${n} days left`) : null]
+    .filter(Boolean).join(" · ");
+  const st = g.done ? "good" : p >= .75 ? "good" : p >= .4 ? "" : (n != null && n < 14) ? "critical" : "warning";
+  return meterRow(g.title + (g.done ? "  ✓" : ""), valText, p, { note, status: st });
+}
+
+function renderGoals() {
+  const goals = [...state.goals].sort((a, b) =>
+    (a.done - b.done) || (a.due || "9999").localeCompare(b.due || "9999"));
+  $("#goalList").innerHTML = goals.length ? `<div class="items">${goals.map(g => {
+    const ms = g.milestones || [];
+    return `<div class="item stack">
+      <div class="item-row">
+        <div class="lead">${icon(g.done ? "check" : "target")}</div>
+        <div class="body">${goalMeter(g)}</div>
+        <div class="side">${actionBtns("goals", g.id)}</div>
+      </div>
+      ${ms.length ? `<div class="checks indent">${ms.map((m, i) => `
+        <div class="check${m.done ? " done" : ""}">
+          <input type="checkbox" id="ms-${g.id}-${i}" data-ms="${g.id}" data-idx="${i}" ${m.done ? "checked" : ""}>
+          <label for="ms-${g.id}-${i}"><span>${esc(m.text)}</span></label>
+        </div>`).join("")}</div>` : ""}
+    </div>`;
+  }).join("")}</div>` : emptyBlock("No goals yet", "A good first set: raise weighted GPA, hit a PT number, reach 100 service hours.");
+
+  const cols = [...state.college].sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999"));
+  $("#collegeList").innerHTML = cols.length ? `<div class="items">${cols.map(c => {
+    const rq = c.requirements || [];
+    const done = rq.filter(r => r.done).length;
+    const n = daysUntil(c.deadline);
+    const st = n == null ? "var(--ink-3)" : n < 0 ? "var(--critical)" : n <= 30 ? "var(--warning)" : "var(--good)";
+    return `<div class="item stack">
+      <div class="item-row">
+        <div class="lead">${icon("cap")}</div>
+        <div class="body">
+          <div class="t">${esc(c.school)}</div>
+          <div class="m"><span class="chip">${esc(c.status || "Researching")}</span>
+            ${c.program ? `<em>${esc(c.program)}</em>` : ""}
+            ${c.deadline ? `<span class="chip"><i class="dot" style="background:${st}"></i>${esc(fmtDate(c.deadline))}${n != null ? ` · ${n < 0 ? -n + "d late" : "in " + n + "d"}` : ""}</span>` : ""}
+          </div>
+          ${c.notes ? `<div class="m"><span>${esc(c.notes)}</span></div>` : ""}
+          ${rq.length ? `<div style="margin-top:8px">${meterRow("Requirements", `${done} / ${rq.length}`, rq.length ? done / rq.length : 0, { status: done === rq.length ? "good" : "" })}</div>` : ""}
+        </div>
+        <div class="side">${actionBtns("college", c.id)}</div>
+      </div>
+      ${rq.length ? `<div class="checks indent">${rq.map((r, i) => `
+        <div class="check${r.done ? " done" : ""}">
+          <input type="checkbox" id="rq-${c.id}-${i}" data-rq="${c.id}" data-idx="${i}" ${r.done ? "checked" : ""}>
+          <label for="rq-${c.id}-${i}"><span>${esc(r.text)}</span></label>
+        </div>`).join("")}</div>` : ""}
+    </div>`;
+  }).join("")}</div>` : emptyBlock("No targets yet", "Add a school or an ROTC scholarship programme — a starter checklist comes with each one.");
+
+  const d = state.meta;
+  $("#storeMeta").textContent = `Storage key ${KEY} · created ${fmtDate(d.created)} · last change ${fmtDate(d.updated)} · ${(d.days || []).length} active days · ` +
+    `${state.academics.terms.length} terms, ${state.academics.courses.length} courses, ${state.fitness.log.length} PT results, ` +
+    `${state.activities.service.length} service entries, ${state.awards.length} awards, ${state.goals.length} goals.`;
+}
+
+const RENDERERS = { overview: renderOverview, academics: renderAcademics, fitness: renderFitness, activities: renderActivities, awards: renderAwards, goals: renderGoals };
+function render() {
+  renderHeader();
+  (RENDERERS[ui.tab] || renderOverview)();
+}
+
+/* ---------- 7. Editor: one dialog driven by field schemas ---------- */
+const SCHEMAS = {
+  profile: {
+    title: "Your profile", sub: "Only used for labels and the class-rank tile.", single: true,
+    get: () => state.profile, put: v => { state.profile = { ...state.profile, ...v }; },
+    fields: [
+      { k: "name", l: "Name", t: "text", ph: "Alex Rivera", wide: true },
+      { k: "school", l: "School", t: "text", ph: "Northside High" },
+      { k: "gradYear", l: "Graduation year", t: "number", ph: "2028" },
+      { k: "branch", l: "JROTC / ROTC programme", t: "text", ph: "Army JROTC" },
+      { k: "rank", l: "Cadet rank", t: "text", ph: "Cadet Sergeant" },
+      { k: "classRank", l: "Class rank", t: "number", ph: "24" },
+      { k: "classSize", l: "Class size", t: "number", ph: "412" }
+    ]
+  },
+  terms: {
+    title: "Grading term", sub: "One row per semester or quarter.", coll: () => state.academics.terms,
+    fields: [
+      { k: "term", l: "Term", t: "select", opts: TERM_ORDER, req: true },
+      { k: "year", l: "Year", t: "number", ph: String(new Date().getFullYear()), req: true },
+      { k: "gpaW", l: "Weighted GPA", t: "number", step: "0.01", hint: "e.g. 4.28" },
+      { k: "gpaU", l: "Unweighted GPA", t: "number", step: "0.01", hint: "out of 4.00" }
+    ]
+  },
+  courses: {
+    title: "Course", sub: "Rigor — AP, IB, dual enrolment, honours — feeds the academics pillar.", coll: () => state.academics.courses,
+    fields: [
+      { k: "name", l: "Course name", t: "text", ph: "AP US History", req: true, wide: true },
+      { k: "level", l: "Level", t: "select", opts: COURSE_LEVELS },
+      { k: "term", l: "Term", t: "text", ph: "Fall 2026" },
+      { k: "grade", l: "Grade", t: "text", ph: "A-" },
+      { k: "credits", l: "Credits", t: "number", step: "0.5", ph: "1" }
+    ]
+  },
+  tests: {
+    title: "Test score", sub: "Your best normalised score counts toward readiness.", coll: () => state.academics.tests,
+    fields: [
+      { k: "name", l: "Test", t: "select", opts: TEST_TYPES, req: true },
+      { k: "date", l: "Date taken", t: "date" },
+      { k: "score", l: "Score", t: "number", step: "0.1", req: true },
+      { k: "max", l: "Max possible", t: "number", hint: "blank = standard scale" },
+      { k: "notes", l: "Section breakdown or notes", t: "text", wide: true, ph: "EBRW 680 · Math 720" }
+    ]
+  },
+  fitevents: {
+    title: "PT events", sub: "Set the events and goal standards your programme tests.", list: true,
+    coll: () => state.fitness.events,
+    fields: [
+      { k: "name", l: "Event name", t: "text", ph: "Push-ups", req: true, wide: true },
+      { k: "unit", l: "Measured in", t: "select", opts: ["reps", "time", "points", "inches", "feet", "laps"], req: true },
+      { k: "goal", l: "Goal", t: "smart", hint: "times as m:ss (6:30) or seconds" },
+      { k: "lower", l: "Lower is better?", t: "select", opts: ["no", "yes"], req: true, def: "no", hint: "yes for runs and timed events" },
+      { k: "note", l: "Note", t: "text", wide: true, ph: "1 minute, chest to fist" }
+    ]
+  },
+  fitlog: {
+    title: "PT result", sub: "One result per event per test date.", coll: () => state.fitness.log,
+    fields: [
+      { k: "eventId", l: "Event", t: "select", opts: () => state.fitness.events.map(e => ({ v: e.id, t: e.name })), req: true, wide: true },
+      { k: "date", l: "Date", t: "date", req: true, def: today },
+      { k: "value", l: "Result", t: "smart", req: true, hint: "reps as a number, times as m:ss" },
+      { k: "notes", l: "Notes", t: "text", wide: true, ph: "Cold gym, felt strong" }
+    ]
+  },
+  sports: {
+    title: "Sport season", sub: "One entry per sport per season.", coll: () => state.activities.sports,
+    fields: [
+      { k: "sport", l: "Sport", t: "text", ph: "Cross country", req: true },
+      { k: "level", l: "Level", t: "select", opts: SPORT_LEVELS },
+      { k: "season", l: "Season", t: "select", opts: ["Fall", "Winter", "Spring", "Summer", "Year-round"] },
+      { k: "year", l: "Year", t: "number", ph: String(new Date().getFullYear()) },
+      { k: "position", l: "Position / event", t: "text", ph: "5000m", wide: true },
+      { k: "stats", l: "Key stat", t: "text", ph: "PR 17:42", wide: true },
+      { k: "highlights", l: "Achievements this season", t: "textarea", wide: true, ph: "All-conference, team captain, varsity letter" }
+    ]
+  },
+  roles: {
+    title: "Leadership role", sub: "Cadet billets, captaincies, offices, jobs.", coll: () => state.activities.roles,
+    fields: [
+      { k: "title", l: "Role", t: "text", ph: "Platoon Sergeant", req: true, wide: true },
+      { k: "org", l: "Organisation", t: "text", ph: "Army JROTC, Northside HS" },
+      { k: "start", l: "Started", t: "date" },
+      { k: "end", l: "Ended", t: "date", hint: "blank = still holding it" },
+      { k: "notes", l: "Responsibilities", t: "textarea", wide: true, ph: "Led 32 cadets, ran weekly drill" }
+    ]
+  },
+  service: {
+    title: "Service hours", sub: "Volunteer and community service.", coll: () => state.activities.service,
+    fields: [
+      { k: "date", l: "Date", t: "date", req: true, def: today },
+      { k: "hours", l: "Hours", t: "number", step: "0.5", req: true },
+      { k: "org", l: "Organisation", t: "text", ph: "Veterans food drive", wide: true },
+      { k: "description", l: "What you did", t: "text", wide: true, ph: "Sorted and boxed donations" }
+    ]
+  },
+  awards: {
+    title: "Award or accomplishment", sub: "Reach matters — level drives the score more than count.", coll: () => state.awards,
+    fields: [
+      { k: "title", l: "Title", t: "text", ph: "Academic Achievement Ribbon", req: true, wide: true },
+      { k: "date", l: "Date", t: "date", req: true, def: today },
+      { k: "category", l: "Category", t: "select", opts: AWARD_CATS },
+      { k: "level", l: "Level", t: "select", opts: AWARD_LEVELS },
+      { k: "notes", l: "Notes", t: "textarea", wide: true, ph: "Top 10% of the cadet corps" }
+    ]
+  },
+  goals: {
+    title: "Goal", sub: "Give it a number and a date so progress is measurable.", coll: () => state.goals,
+    fields: [
+      { k: "title", l: "Goal", t: "text", ph: "Reach 100 service hours", req: true, wide: true },
+      { k: "category", l: "Category", t: "select", opts: GOAL_CATS },
+      { k: "due", l: "Target date", t: "date" },
+      { k: "current", l: "Current value", t: "number", step: "0.1" },
+      { k: "target", l: "Target value", t: "number", step: "0.1" },
+      { k: "unit", l: "Unit", t: "text", ph: "hours" },
+      { k: "done", l: "Completed?", t: "select", opts: ["no", "yes"], req: true, def: "no" },
+      { k: "milestones", l: "Milestones (one per line)", t: "lines", wide: true, ph: "Sign up for the food drive\nLog 25 hours\nLog 50 hours" }
+    ]
+  },
+  college: {
+    title: "College or ROTC target", sub: "A starter ROTC checklist is filled in for new targets.", coll: () => state.college,
+    fields: [
+      { k: "school", l: "School or programme", t: "text", ph: "The Citadel", req: true, wide: true },
+      { k: "status", l: "Status", t: "select", opts: COLLEGE_STATUS },
+      { k: "deadline", l: "Deadline", t: "date" },
+      { k: "program", l: "ROTC programme", t: "text", ph: "Army ROTC 4-year scholarship", wide: true },
+      { k: "notes", l: "Notes", t: "textarea", wide: true, ph: "Needs 2 recommendations and a fitness assessment" },
+      { k: "requirements", l: "Requirements (one per line)", t: "lines", wide: true, def: () => defaultROTCChecklist().join("\n") }
+    ]
+  }
+};
+
+let editing = null; // { kind, id }
+
+function fieldHTML(f, val) {
+  const id = "f_" + f.k;
+  const req = f.req ? " required" : "";
+  let input;
+  if (f.t === "select") {
+    const opts = (typeof f.opts === "function" ? f.opts() : f.opts).map(o =>
+      typeof o === "string" ? { v: o, t: o } : o);
+    input = `<select id="${id}" name="${f.k}"${req}>${f.req ? "" : `<option value=""></option>`}${opts.map(o =>
+      `<option value="${esc(o.v)}"${String(val) === String(o.v) ? " selected" : ""}>${esc(o.t)}</option>`).join("")}</select>`;
+  } else if (f.t === "textarea" || f.t === "lines") {
+    input = `<textarea id="${id}" name="${f.k}" placeholder="${esc(f.ph || "")}">${esc(val ?? "")}</textarea>`;
+  } else if (f.t === "smart") {
+    input = `<input id="${id}" name="${f.k}" type="text" inputmode="decimal" placeholder="${esc(f.ph || "")}" value="${esc(val ?? "")}"${req}>`;
+  } else {
+    input = `<input id="${id}" name="${f.k}" type="${f.t}"${f.step ? ` step="${f.step}"` : ""} placeholder="${esc(f.ph || "")}" value="${esc(val ?? "")}"${req}>`;
+  }
+  return `<div class="field${f.wide || f.t === "textarea" || f.t === "lines" ? " wide" : ""}">
+    <label for="${id}">${esc(f.l)}</label>${input}${f.hint ? `<span class="hint">${esc(f.hint)}</span>` : ""}</div>`;
+}
+
+function displayValue(sc, f, rec) {
+  let v = rec ? rec[f.k] : undefined;
+  if (v === undefined || v === null) v = f.def ? (typeof f.def === "function" ? f.def() : f.def) : "";
+  if (f.t === "lines" && Array.isArray(v)) v = v.map(x => x.text ?? x).join("\n");
+  if (f.k === "lower") v = v === true ? "yes" : v === false ? "no" : v;
+  if (f.k === "done") v = v === true ? "yes" : v === false ? "no" : v;
+  if (f.t === "smart" && Number.isFinite(v)) {
+    // show times back as m:ss for the event's own unit
+    const unit = sc === "fitlog" ? (eventById(rec && rec.eventId) || {}).unit : (rec || {}).unit;
+    v = unit === "time" ? fmtTime(v) : v;
+  }
+  return v;
+}
+
+function openEditor(kind, id) {
+  const sc = SCHEMAS[kind];
+  if (!sc) return;
+  if (kind === "fitlog" && !state.fitness.events.length) { toast("Add a PT event first"); return; }
+  editing = { kind, id };
+  const rec = sc.single ? sc.get() : (id ? sc.coll().find(x => x.id === id) : null);
+  $("#dlgTitle").textContent = (id || sc.single ? "Edit " : "New ") + sc.title.toLowerCase();
+  $("#dlgSub").textContent = sc.sub || "";
+  $("#dlgFields").innerHTML = sc.fields.map(f => fieldHTML(f, displayValue(kind, f, rec))).join("");
+  $("#dlgDelete").hidden = !(id && !sc.single);
+  $("#dlg").showModal();
+  const first = $("#dlgFields input, #dlgFields select, #dlgFields textarea");
+  if (first) setTimeout(() => first.focus(), 40);
+}
+
+function readForm(kind, rec) {
+  const sc = SCHEMAS[kind], fd = new FormData($("#dlgForm")), out = {};
+  for (const f of sc.fields) {
+    const raw = (fd.get(f.k) ?? "").toString().trim();
+    if (f.t === "number") out[f.k] = raw === "" ? null : num(raw);
+    else if (f.t === "smart") out[f.k] = raw === "" ? null : parseTimeInput(raw);
+    else if (f.k === "lower" || f.k === "done") out[f.k] = raw === "yes";
+    else if (f.t === "lines") {
+      const prev = (rec && Array.isArray(rec[f.k])) ? rec[f.k] : [];
+      out[f.k] = raw.split("\n").map(s => s.trim()).filter(Boolean).map(text => ({
+        text, done: !!(prev.find(p => (p.text ?? p) === text) || {}).done
+      }));
+    } else out[f.k] = raw;
+  }
+  return out;
+}
+
+function submitEditor(e) {
+  e.preventDefault();
+  const { kind, id } = editing || {};
+  if (kind === "__sync__") { saveSyncSetup(); return; }
+  const sc = SCHEMAS[kind];
+  if (!sc) return;
+  const rec = sc.single ? sc.get() : (id ? sc.coll().find(x => x.id === id) : null);
+  const vals = readForm(kind, rec);
+
+  const before = state.goals.map(g => ({ id: g.id, p: goalProgress(g) }));
+
+  if (sc.single) { sc.put(vals); }
+  else if (rec) { Object.assign(rec, vals); }
+  else { sc.coll().push({ id: uid(), ...vals }); }
+
+  save();
+  $("#dlg").close();
+  render();
+
+  // celebrate a goal crossing the line
+  const now = state.goals.map(g => ({ id: g.id, p: goalProgress(g) }));
+  if (now.some(n => n.p >= 1 && (before.find(b => b.id === n.id) || { p: 0 }).p < 1)) {
+    confetti(); toast("Goal complete — nice work");
+  }
+}
+
+function deleteRecord() {
+  const { kind, id } = editing || {};
+  const sc = SCHEMAS[kind];
+  if (!sc || !id || sc.single) return;
+  if (!confirm("Delete this entry? This cannot be undone.")) return;
+  const c = sc.coll(), i = c.findIndex(x => x.id === id);
+  if (i > -1) c.splice(i, 1);
+  // orphaned PT results go with their event
+  if (kind === "fitevents") state.fitness.log = state.fitness.log.filter(l => l.eventId !== id);
+  save(); $("#dlg").close(); render(); toast("Deleted");
+}
+
+/* ---------- 8. Chrome behaviours ---------- */
+let toastT;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2300);
+}
+function countUp(el, to, fmt) {
+  const from = parseInt(el.textContent, 10) || 0;
+  if (from === to) { el.innerHTML = fmt(to); return; }
+  const t0 = performance.now(), dur = 780;
+  const step = t => {
+    const k = clamp((t - t0) / dur);
+    const e = 1 - Math.pow(1 - k, 3);
+    el.innerHTML = fmt(Math.round(from + (to - from) * e));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function confetti() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const box = document.createElement("div");
+  box.className = "confetti";
+  const cols = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
+  for (let i = 0; i < 44; i++) {
+    const p = document.createElement("i");
+    p.style.left = (10 + Math.random() * 80) + "vw";
+    p.style.top = (10 + Math.random() * 18) + "vh";
+    p.style.background = cols[i % 4];
+    p.style.setProperty("--dx", (Math.random() * 200 - 100) + "px");
+    p.style.setProperty("--rot", Math.round(Math.random() * 900 - 450) + "deg");
+    p.style.animationDelay = (Math.random() * .28) + "s";
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 2100);
+}
+function setTab(name) {
+  ui.tab = name;
+  $$(".tab").forEach(b => {
+    const on = b.id === "tab-" + name;
+    b.setAttribute("aria-selected", on ? "true" : "false");
+    $("#" + b.getAttribute("aria-controls")).hidden = !on;
+  });
+  render();
+  location.hash = name;
+}
+function applyTheme(t) {
+  if (t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+  localStorage.setItem("pcc.theme", t);
+}
+function cycleTheme() {
+  const cur = localStorage.getItem("pcc.theme") || "auto";
+  const next = cur === "auto" ? "light" : cur === "light" ? "dark" : "auto";
+  applyTheme(next);
+  toast("Theme: " + next);
+  render();
+}
+
+/* ---------- 9. Backup / restore ---------- */
+function download() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `progress-${today()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast("Backup downloaded — keep it somewhere private");
+}
+function restore(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const parsed = JSON.parse(r.result);
+      if (!parsed || typeof parsed !== "object") throw new Error("not an object");
+      if (!confirm("Replace everything currently on this dashboard with the contents of this file?")) return;
+      state = migrate(parsed);
+      save(true); render(); toast("Restored from file");
+    } catch (e) { toast("That file is not a valid backup"); console.error(e); }
+  };
+  r.readAsText(file);
+}
+function exampleState() {
+  const s = defaultState();
+  const y = new Date().getFullYear();
+  s.profile = { name: "Alex Rivera", school: "Northside High School", gradYear: y + 2, branch: "Army JROTC", rank: "Cadet Staff Sergeant", classRank: 24, classSize: 412 };
+  s.academics.terms = [
+    { id: uid(), term: "Fall", year: y - 2, gpaW: 3.72, gpaU: 3.55 },
+    { id: uid(), term: "Spring", year: y - 1, gpaW: 3.88, gpaU: 3.64 },
+    { id: uid(), term: "Fall", year: y - 1, gpaW: 4.05, gpaU: 3.71 },
+    { id: uid(), term: "Spring", year: y, gpaW: 4.21, gpaU: 3.80 }
+  ];
+  s.academics.courses = [
+    { id: uid(), name: "AP US History", level: "AP", term: "Fall " + y, grade: "A-", credits: 1 },
+    { id: uid(), name: "AP Calculus AB", level: "AP", term: "Fall " + y, grade: "B+", credits: 1 },
+    { id: uid(), name: "Honors Chemistry", level: "Honors", term: "Fall " + y, grade: "A", credits: 1 },
+    { id: uid(), name: "JROTC Leadership III", level: "Elective", term: "Fall " + y, grade: "A", credits: 1 },
+    { id: uid(), name: "English III", level: "Regular", term: "Fall " + y, grade: "A-", credits: 1 },
+    { id: uid(), name: "Intro to Statistics", level: "Dual enrollment", term: "Fall " + y, grade: "A", credits: 3 }
+  ];
+  s.academics.tests = [
+    { id: uid(), name: "PSAT/NMSQT", date: `${y - 1}-10-12`, score: 1230, max: null, notes: "EBRW 620 · Math 610" },
+    { id: uid(), name: "SAT", date: `${y}-03-09`, score: 1340, max: null, notes: "EBRW 680 · Math 660" }
+  ];
+  const ev = s.fitness.events;
+  const dates = [`${y - 1}-09-15`, `${y - 1}-12-05`, `${y}-02-20`, `${y}-05-08`];
+  const seeds = { "Push-ups": [34, 41, 47, 52], "Curl-ups": [48, 54, 60, 66], "Pull-ups": [5, 7, 8, 10], "One-mile run": [468, 447, 424, 408], "Two-mile run": [1020, 984, 942, 906], "Shuttle run": [11.2, 10.8, 10.4, 10.1] };
+  ev.forEach(e => (seeds[e.name] || []).forEach((v, i) => s.fitness.log.push({ id: uid(), eventId: e.id, date: dates[i], value: v, notes: "" })));
+  s.activities.sports = [
+    { id: uid(), sport: "Cross country", level: "Varsity", season: "Fall", year: y, position: "5000m", stats: "PR 17:42", highlights: "All-conference, varsity letter" },
+    { id: uid(), sport: "Wrestling", level: "Junior varsity", season: "Winter", year: y, position: "145 lb", stats: "14-6", highlights: "Most improved wrestler" },
+    { id: uid(), sport: "Track & field", level: "Varsity", season: "Spring", year: y, position: "800m / 1600m", stats: "PR 2:04", highlights: "Regional qualifier" }
+  ];
+  s.activities.roles = [
+    { id: uid(), title: "Platoon Sergeant", org: "Army JROTC", start: `${y}-08-15`, end: "", notes: "Leads 32 cadets, runs weekly drill" },
+    { id: uid(), title: "Colour Guard Commander", org: "Army JROTC", start: `${y - 1}-09-01`, end: `${y}-05-30`, notes: "14 community events" },
+    { id: uid(), title: "Team Captain", org: "Cross country", start: `${y}-08-01`, end: "", notes: "" }
+  ];
+  const orgs = [["Veterans food drive", "Sorted and boxed donations"], ["Habitat build day", "Framing and cleanup"], ["Cemetery flag detail", "Placed 300 flags"], ["Tutoring centre", "Algebra tutoring"], ["Park cleanup", "Trail maintenance"]];
+  for (let i = 0; i < 16; i++) {
+    const d = new Date(); d.setMonth(d.getMonth() - (15 - i));
+    const o = orgs[i % orgs.length];
+    s.activities.service.push({ id: uid(), date: d.toISOString().slice(0, 10), hours: [3, 4, 5, 6, 8][i % 5], org: o[0], description: o[1] });
+  }
+  s.awards = [
+    { id: uid(), title: "Academic Achievement Ribbon", date: `${y}-05-20`, category: "JROTC", level: "School", notes: "GPA above 3.5 for the year" },
+    { id: uid(), title: "Leadership Ribbon", date: `${y}-04-11`, category: "JROTC", level: "School", notes: "Platoon Sergeant billet" },
+    { id: uid(), title: "Drill Team — 2nd place", date: `${y}-03-02`, category: "JROTC", level: "State", notes: "State drill meet, armed exhibition" },
+    { id: uid(), title: "Regional cross country qualifier", date: `${y - 1}-11-04`, category: "Athletic", level: "District", notes: "" },
+    { id: uid(), title: "Presidential Volunteer Service Award", date: `${y}-06-01`, category: "Service", level: "National", notes: "100+ hours in a year" },
+    { id: uid(), title: "Honour Roll — all four terms", date: `${y}-06-05`, category: "Academic", level: "School", notes: "" }
+  ];
+  s.goals = [
+    { id: uid(), title: "Weighted GPA to 4.35", category: "Academics", due: `${y + 1}-06-01`, current: 4.21, target: 4.35, unit: "GPA", done: false, milestones: [{ text: "Raise AP Calc to an A-", done: false }, { text: "Weekly study block on Sundays", done: true }] },
+    { id: uid(), title: "60 push-ups in one minute", category: "Fitness", due: `${y + 1}-03-01`, current: 52, target: 60, unit: "reps", done: false, milestones: [{ text: "Hit 45", done: true }, { text: "Hit 52", done: true }, { text: "Hit 60", done: false }] },
+    { id: uid(), title: "150 service hours", category: "Service", due: `${y + 1}-05-15`, current: 84, target: 150, unit: "hours", done: false, milestones: [{ text: "100 hours", done: false }] },
+    { id: uid(), title: "SAT 1400+", category: "College", due: `${y + 1}-10-01`, current: 1340, target: 1400, unit: "points", done: false, milestones: [{ text: "Finish official practice test 6", done: true }, { text: "Register for the autumn sitting", done: false }] },
+    { id: uid(), title: "Earn the Cadet Battalion S-3 billet", category: "Leadership", due: `${y + 1}-08-15`, current: null, target: null, unit: "", done: false, milestones: [{ text: "Complete cadet leadership course", done: true }, { text: "Interview with the SAI", done: false }] }
+  ];
+  s.college = [
+    { id: uid(), school: "The Citadel", status: "Researching", deadline: `${y + 1}-11-01`, program: "Army ROTC 4-year scholarship", notes: "Campus visit booked for spring", requirements: defaultROTCChecklist().map((t, i) => ({ text: t, done: i < 3 })) },
+    { id: uid(), school: "Virginia Tech", status: "In progress", deadline: `${y + 1}-12-01`, program: "Army ROTC", notes: "Needs two teacher recommendations", requirements: defaultROTCChecklist().map((t, i) => ({ text: t, done: i < 2 })) },
+    { id: uid(), school: "US Military Academy — West Point", status: "In progress", deadline: `${y + 1}-01-31`, program: "Direct commission", notes: "Congressional nomination packet, CFA in the spring", requirements: ["Open a candidate file", "Request a congressional nomination", "Complete the Candidate Fitness Assessment", "Medical qualification (DoDMERB)", "Submit the school official evaluation"].map((t, i) => ({ text: t, done: i < 1 })) }
+  ];
+  const days = [];
+  for (let i = 0; i < 9; i++) { const d = new Date(); d.setDate(d.getDate() - i); days.push(d.toISOString().slice(0, 10)); }
+  s.meta = { created: `${y - 2}-08-20`, updated: today(), days: days.sort() };
+  return s;
+}
+
+
+/* ---------- 9b. Google Drive sync ----------
+   Data is stored in the Drive "appDataFolder": a hidden per-user folder that
+   only this app can see. The drive.appdata scope grants no access to anything
+   else in the user's Drive. No server is involved — the browser talks to
+   Google directly, so there is nothing in the middle holding the record.      */
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
+const DRIVE_FILE = "progress.json";
+const CID_KEY = "pcc.gclient";
+
+let gTokenClient = null, gToken = null, gTokenExp = 0, gFileId = null, gAfterAuth = null, gSilent = false;
+let syncState = "off", syncNote = "", pushTimer = null;
+
+const clientId = () => (localStorage.getItem(CID_KEY) || "").trim();
+const gisReady = () => typeof google !== "undefined" && google.accounts && google.accounts.oauth2;
+const tokenLive = () => !!gToken && Date.now() < gTokenExp;
+
+function setSync(st, note) {
+  syncState = st; syncNote = note || "";
+  const chip = $("#syncChip"), label = $("#syncLabel");
+  if (!chip) return;
+  chip.dataset.state = st;
+  label.textContent = { off: "Sync off", ready: "Connect", working: "Syncing…", ok: "Synced", error: "Sync issue" }[st] || "Sync";
+  chip.title = note || "Google Drive sync";
+  renderSyncCard();
+}
+
+function authErrorText(resp) {
+  const e = (resp.error || "") + " " + (resp.error_description || "");
+  if (/access_denied/i.test(e))
+    return "Google refused access. Add your own address under Test users on the OAuth consent screen.";
+  if (/invalid_client|unauthorized_client/i.test(e))
+    return "Google did not accept the client ID. Check it was pasted in full, and that " + location.origin + " is listed under Authorised JavaScript origins.";
+  if (/idpiframe|not a valid origin|origin/i.test(e))
+    return "Origin not registered. Add exactly " + location.origin + " under Authorised JavaScript origins, then wait a minute for Google to apply it.";
+  return resp.error_description || resp.error || "Google sign-in failed";
+}
+
+function initTokenClient() {
+  if (gTokenClient) return true;
+  if (!gisReady() || !clientId()) return false;
+  try {
+    gTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId(),
+      scope: DRIVE_SCOPE,
+      callback: resp => {
+        if (resp.error) {
+          gAfterAuth = null;
+          // A failed background reconnect, or a popup the user simply closed, is
+          // not a fault worth flagging — drop back to "Connect" quietly.
+          if (gSilent || resp.error === "popup_closed_by_user") {
+            setSync("ready", gSilent ? "" : "Sign-in window closed");
+            gSilent = false;
+            return;
+          }
+          setSync("error", authErrorText(resp));
+          return;
+        }
+        gSilent = false;
+        gToken = resp.access_token;
+        gTokenExp = Date.now() + ((resp.expires_in || 3600) * 1000) - 60000;
+        localStorage.setItem("pcc.gconnected", "1");
+        const f = gAfterAuth; gAfterAuth = null;
+        if (f) f();
+      }
+    });
+    return true;
+  } catch (e) { setSync("error", "Could not start Google sign-in: " + e.message); return false; }
+}
+
+function connect(then) {
+  if (!clientId()) { openSyncSetup(); return; }
+  if (!gisReady()) { setSync("error", "Google sign-in script did not load — check your connection or an ad blocker"); return; }
+  if (!initTokenClient()) { setSync("error", "Could not start Google sign-in"); return; }
+  gAfterAuth = then;
+  gSilent = false;
+  setSync("working", "Waiting for Google…");
+  gTokenClient.requestAccessToken({ prompt: "" });
+}
+
+function disconnect() {
+  if (gToken && gisReady()) { try { google.accounts.oauth2.revoke(gToken, () => {}); } catch (e) {} }
+  gToken = null; gTokenExp = 0; gFileId = null;
+  localStorage.removeItem("pcc.gconnected");
+  setSync("ready", "Disconnected — your record is still on this device");
+  toast("Disconnected from Google Drive");
+}
+
+async function driveFetch(url, opts = {}) {
+  const r = await fetch(url, { ...opts, headers: { Authorization: "Bearer " + gToken, ...(opts.headers || {}) } });
+  if (r.status === 401 || r.status === 403) {
+    gToken = null; gTokenExp = 0;
+    throw new Error("Google session expired — press Connect again");
+  }
+  if (!r.ok) throw new Error("Drive error " + r.status + ": " + (await r.text()).slice(0, 140));
+  return r;
+}
+
+async function findFile() {
+  const q = encodeURIComponent(`name='${DRIVE_FILE}' and trashed=false`);
+  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,modifiedTime)&q=${q}`);
+  const j = await r.json();
+  return (j.files && j.files[0]) || null;
+}
+
+async function pushToDrive() {
+  const body = JSON.stringify(state, null, 2);
+  let f = gFileId ? { id: gFileId } : await findFile();
+  if (f) {
+    gFileId = f.id;
+    await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${f.id}?uploadType=media`,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body });
+  } else {
+    const b = "pccb" + Date.now();
+    const meta = JSON.stringify({ name: DRIVE_FILE, parents: ["appDataFolder"] });
+    const multipart =
+      `--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+      `--${b}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${b}--`;
+    const r = await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
+      { method: "POST", headers: { "Content-Type": "multipart/related; boundary=" + b }, body: multipart });
+    gFileId = (await r.json()).id;
+  }
+  state.meta.syncedAt = new Date().toISOString();
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+async function pullFromDrive() {
+  const f = gFileId ? { id: gFileId } : await findFile();
+  if (!f) return null;
+  gFileId = f.id;
+  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`);
+  return { data: await r.json(), modifiedTime: f.modifiedTime };
+}
+
+const isEmptyState = s2 => !s2.academics.terms.length && !s2.academics.courses.length &&
+  !s2.fitness.log.length && !s2.awards.length && !s2.goals.length &&
+  !s2.activities.service.length && !s2.college.length;
+
+/* First connect: decide between the cloud copy and this device, and never
+   silently discard either. */
+async function syncNow(afterConnect) {
+  if (!tokenLive()) { connect(() => syncNow(afterConnect)); return; }
+  setSync("working", "Talking to Drive…");
+  try {
+    const remote = await pullFromDrive();
+    if (!remote) { await pushToDrive(); setSync("ok", "Uploaded — cloud copy created"); toast("Saved to Google Drive"); render(); return; }
+
+    const localEmpty = isEmptyState(state), remoteEmpty = isEmptyState(migrate(remote.data));
+    if (localEmpty && !remoteEmpty) {
+      state = migrate(remote.data); save(true); setSync("ok", "Loaded your record from Drive"); toast("Loaded from Google Drive"); render(); return;
+    }
+    if (remoteEmpty || !afterConnect) { await pushToDrive(); setSync("ok", "Saved to Drive"); if (!afterConnect) toast("Saved to Google Drive"); render(); return; }
+
+    // both sides hold data on a fresh connect — let the user choose
+    const rt = new Date(remote.modifiedTime), lt = new Date((state.meta.updated || "") + "T23:59:59");
+    const keepCloud = confirm(
+      "Both this device and Google Drive have saved progress.\n\n" +
+      "Drive copy last saved: " + rt.toLocaleString() + "\n" +
+      "This device last changed: " + fmtDate(state.meta.updated) + "\n\n" +
+      "OK  = use the Drive copy (replaces what is on this device)\n" +
+      "Cancel = keep this device's copy (overwrites Drive)");
+    if (keepCloud) { state = migrate(remote.data); save(true); setSync("ok", "Using the Drive copy"); }
+    else { await pushToDrive(); setSync("ok", "Drive updated from this device"); }
+    render();
+  } catch (e) {
+    setSync("error", e.message);
+    toast(e.message.slice(0, 90));
+  }
+}
+
+/* Debounced background push — every edit reaches Drive without a button press. */
+function queuePush() {
+  if (!tokenLive()) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    try { setSync("working", "Saving…"); await pushToDrive(); setSync("ok", "All changes saved to Drive"); }
+    catch (e) { setSync("error", e.message); }
+  }, 2500);
+}
+
+function renderSyncCard() {
+  const line = $("#syncStatusLine"), btns = $("#syncButtons"), det = $("#syncDetail");
+  if (!line || !btns) return;
+  const connected = tokenLive();
+  line.textContent = connected ? "Connected" : clientId() ? "Set up, not connected" : "Not set up";
+
+  const b = [];
+  if (!clientId()) b.push(`<button class="btn primary" data-sync="setup" type="button">Set up Google sync</button>`);
+  else if (!connected) b.push(`<button class="btn primary" data-sync="connect" type="button">Connect Google Drive</button>`,
+                              `<button class="btn" data-sync="setup" type="button">Change client ID</button>`);
+  else b.push(`<button class="btn primary" data-sync="now" type="button">Sync now</button>`,
+              `<button class="btn" data-sync="disconnect" type="button">Disconnect</button>`,
+              `<button class="btn ghost" data-sync="setup" type="button">Change client ID</button>`);
+  btns.innerHTML = b.join("");
+
+  const bits = [];
+  if (syncNote) bits.push(syncNote);
+  if (state.meta.syncedAt) bits.push("Last upload " + new Date(state.meta.syncedAt).toLocaleString());
+  if (!clientId()) bits.push("Sync needs a free Google Cloud OAuth client ID — the setup button walks you through it.");
+  det.textContent = bits.join(" · ");
+}
+
+function openSyncSetup() {
+  const cur = clientId();
+  $("#dlgTitle").textContent = "Set up Google Drive sync";
+  $("#dlgSub").textContent = "One-time setup. Everything below is free and takes about five minutes.";
+  $("#dlgFields").innerHTML = `
+    <div class="field wide">
+      <ol class="setup-steps">
+        <li><span>Open <code>console.cloud.google.com</code> and create a project (any name).</span></li>
+        <li><span>In <strong>APIs &amp; Services → Library</strong>, search <code>Google Drive API</code> and enable it.</span></li>
+        <li><span>In <strong>OAuth consent screen</strong>, choose <strong>External</strong>, fill in an app name and your email, then add your own Google address under <strong>Test users</strong>.</span></li>
+        <li><span>In <strong>Credentials → Create credentials → OAuth client ID</strong>, choose <strong>Web application</strong>.</span></li>
+        <li><span>Under <strong>Authorised JavaScript origins</strong> add exactly <code>${esc(location.origin)}</code></span></li>
+        <li><span>Copy the client ID (it ends in <code>.apps.googleusercontent.com</code>) and paste it below.</span></li>
+      </ol>
+      <label for="f_cid">Google OAuth client ID</label>
+      <input id="f_cid" name="cid" type="text" placeholder="1234567890-abcdef.apps.googleusercontent.com" value="${esc(cur)}">
+      <span class="hint">Stored only in this browser. It is not a secret — it identifies the app, not you.</span>
+    </div>`;
+  $("#dlgDelete").hidden = true;
+  editing = { kind: "__sync__" };
+  $("#dlg").showModal();
+  setTimeout(() => { const el = $("#f_cid"); if (el) el.focus(); }, 40);
+}
+
+function saveSyncSetup() {
+  const v = ($("#f_cid").value || "").trim();
+  localStorage.setItem(CID_KEY, v);
+  gTokenClient = null; gToken = null; gTokenExp = 0;
+  $("#dlg").close();
+  setSync(v ? "ready" : "off", v ? "Client ID saved — press Connect" : "");
+  if (v) toast("Client ID saved"); 
+  render();
+}
+
+/* ---------- 10. Wiring & init ---------- */
+function wire() {
+  $$(".tab").forEach(b => b.addEventListener("click", () => setTab(b.getAttribute("aria-controls").slice(2))));
+
+  document.addEventListener("click", e => {
+    const t = e.target.closest("[data-add],[data-edit],[data-goto],[data-toggle-table],[data-flag]");
+    if (!t) return;
+    if (t.dataset.add) openEditor(t.dataset.add, null);
+    else if (t.dataset.edit) openEditor(t.dataset.edit, t.dataset.id);
+    else if (t.dataset.goto) setTab(t.dataset.goto);
+    else if (t.dataset.toggleTable) {
+      const el = $("#" + t.dataset.toggleTable);
+      if (!el) return;
+      const showing = el.hidden;
+      el.hidden = !showing;
+      t.setAttribute("aria-pressed", showing ? "true" : "false");
+    } else if (t.dataset.flag === "fitAll") {
+      ui.fitAll = !ui.fitAll;
+      t.setAttribute("aria-pressed", ui.fitAll ? "true" : "false");
+      t.textContent = ui.fitAll ? "Show recent" : "Show all";
+      renderFitness();
+    }
+  });
+
+  document.addEventListener("change", e => {
+    const c = e.target;
+    if (c.dataset.ms) {
+      const g = state.goals.find(x => x.id === c.dataset.ms);
+      if (!g) return;
+      const before = goalProgress(g);
+      g.milestones[+c.dataset.idx].done = c.checked;
+      save(true); render();
+      if (goalProgress(g) >= 1 && before < 1) { confetti(); toast("Goal complete — nice work"); }
+    } else if (c.dataset.rq) {
+      const col = state.college.find(x => x.id === c.dataset.rq);
+      if (!col) return;
+      col.requirements[+c.dataset.idx].done = c.checked;
+      save(true); render();
+    }
+  });
+
+  $("#syncChip").addEventListener("click", () => {
+    if (!clientId()) return openSyncSetup();
+    if (!tokenLive()) return connect(() => syncNow(true));
+    syncNow(false);
+  });
+  document.addEventListener("click", e => {
+    const t = e.target.closest("[data-sync]");
+    if (!t) return;
+    ({ setup: openSyncSetup, connect: () => connect(() => syncNow(true)),
+       now: () => syncNow(false), disconnect })[t.dataset.sync]();
+  });
+
+  $("#dlgForm").addEventListener("submit", submitEditor);
+  $("#dlgCancel").addEventListener("click", () => $("#dlg").close());
+  $("#dlgDelete").addEventListener("click", deleteRecord);
+  $("#btnProfile").addEventListener("click", () => openEditor("profile"));
+  $("#btnTheme").addEventListener("click", cycleTheme);
+  $("#btnSave").addEventListener("click", download);
+  $("#btnSave2").addEventListener("click", download);
+  const pick = () => $("#filePick").click();
+  $("#btnLoad").addEventListener("click", pick);
+  $("#btnLoad2").addEventListener("click", pick);
+  $("#filePick").addEventListener("change", e => { if (e.target.files[0]) restore(e.target.files[0]); e.target.value = ""; });
+
+  $("#btnSeed").addEventListener("click", () => {
+    if (!confirm("Load the example dataset? This replaces everything currently on the dashboard.")) return;
+    state = exampleState(); save(true); render(); confetti(); toast("Example data loaded — Erase everything to start clean");
+  });
+  $("#btnWipe").addEventListener("click", () => {
+    if (!confirm("Erase all saved progress on this device? Download a backup first if you want to keep it.")) return;
+    state = defaultState(); localStorage.removeItem(KEY); save(true); render(); toast("Cleared");
+  });
+
+  let rt;
+  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 160); });
+  addEventListener("keydown", e => {
+    if (e.key === "Escape" && $("#dlg").open) $("#dlg").close();
+  });
+}
+
+(function init() {
+  applyTheme(localStorage.getItem("pcc.theme") || "light");
+  load();
+  drawHeaderOrnament();
+  drawWreath();
+  wire();
+  setSync(clientId() ? "ready" : "off", "");
+  if (clientId() && localStorage.getItem("pcc.gconnected")) {
+    // GIS loads async; give it a moment, then reconnect without a popup if the grant is still live
+    setTimeout(() => {
+      if (gisReady() && initTokenClient()) {
+        gSilent = true;
+        gAfterAuth = () => { gSilent = false; syncNow(true); };
+        gTokenClient.requestAccessToken({ prompt: "none" });
+      }
+    }, 1200);
+  }
+  const h = (location.hash || "").replace("#", "");
+  setTab(RENDERERS[h] ? h : "overview");
+})();
+</script>
+</body>
+</html>
