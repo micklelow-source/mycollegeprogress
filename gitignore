@@ -1,0 +1,7 @@
+# Your progress record is personal data — this repo is public, so it never
+# belongs in git. The dashboard keeps it in your browser's local storage and
+# hands you a copy via the Backup button; store that copy somewhere private.
+data/
+progress-*.json
+progress.json
+*.backup.json
